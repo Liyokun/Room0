@@ -22,20 +22,28 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. SETUP ---
+        // --- 1. SETUP SCENE CHÍNH (3D) ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        // KHÔNG CÓ SƯƠNG MÙ
-        scene.fog = null;
+        scene.fog = null; // Không sương mù
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.6, 3);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // QUAN TRỌNG: Tắt tự động xóa để vẽ chồng 2 scene lên nhau
+        renderer.autoClear = false; 
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. MÔI TRƯỜNG ---
+        // --- 2. SETUP SCENE HUD (MÀN HÌNH 2D ĐỂ VẼ MƯA) ---
+        // Scene này sẽ luôn nằm trên cùng, không bị phông nền 3D che khuất
+        const sceneHUD = new THREE.Scene();
+        // Camera trực giao (2D flat) cho HUD
+        const cameraHUD = new THREE.OrthographicCamera(-window.innerWidth / 2, window.innerWidth / 2, window.innerHeight / 2, -window.innerHeight / 2, 1, 10);
+        cameraHUD.position.z = 10;
+
+        // --- 3. MÔI TRƯỜNG 3D ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
@@ -54,42 +62,42 @@
         const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
         rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- 3. MƯA (ĐƠN GIẢN & HIỆU QUẢ) ---
+        // --- 4. TẠO MƯA TRÊN LỚP HUD (GIẢI PHÁP CHO PHÔNG NỀN) ---
         const rainCount = 2000;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         
         for(let i=0; i<rainCount; i++) {
-            rainPos[i*3] = (Math.random() - 0.5) * 40; // Rải rộng 40m
-            rainPos[i*3+1] = Math.random() * 20;       // Cao 20m
-            rainPos[i*3+2] = (Math.random() - 0.5) * 40;
+            // Rải mưa trên toàn bộ diện tích màn hình 2D
+            rainPos[i*3] = (Math.random() - 0.5) * width; 
+            rainPos[i*3+1] = (Math.random() - 0.5) * height;
+            rainPos[i*3+2] = 0; // Z = 0 vì là màn hình phẳng
         }
         rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
         const rainMat = new THREE.PointsMaterial({
             color: 0xaaaaaa,
-            size: 0.1, // Hạt mưa to rõ
+            size: 3, // Kích thước hạt trên màn hình 2D (pixel)
             transparent: true,
-            opacity: 0.6
+            opacity: 0.6,
+            sizeAttenuation: false // Kích thước không đổi theo khoảng cách
         });
         const rainSystem = new THREE.Points(rainGeo, rainMat);
-        scene.add(rainSystem);
+        // THÊM MƯA VÀO SCENE HUD, KHÔNG PHẢI SCENE 3D CHÍNH
+        sceneHUD.add(rainSystem);
 
-        // --- 4. HỐ ĐEN (COPY TỪ CODE THAM KHẢO + CHỈNH MÀU ĐỎ/HỒNG) ---
-        let portalCore, portalRing, pSystem;
+        // --- 5. HỐ ĐEN & HẠT ĐỎ (ĐÃ XÓA VÒNG XOAY) ---
+        let portalCore, pSystem;
         function createVoidPortal() {
             // Lõi đen
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; 
             scene.add(portalCore);
 
-            // Vòng năng lượng
-            const ringGeo = new THREE.RingGeometry(1.5, 2.2, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0055, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
-            portalRing = new THREE.Mesh(ringGeo, ringMat);
-            portalRing.rotation.x = -Math.PI / 2; portalRing.position.y = -0.04;
-            scene.add(portalRing);
+            // --- ĐÃ XÓA ĐOẠN CODE TẠO VÒNG RING Ở ĐÂY ---
 
-            // HẠT TĨNH (STATIC PARTICLES) - MÀU ĐỎ/HỒNG NHƯ MẪU
+            // HẠT TĨNH (Cụm mây hạt đỏ/hồng)
             const particlesGeo = new THREE.BufferGeometry();
             const pCount = 300;
             const pArr = new Float32Array(pCount * 3);
@@ -98,15 +106,14 @@
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
             
-            // Màu Hồng Đậm (0xff0055)
             const pMat = new THREE.PointsMaterial({ color: 0xff0055, size: 0.08, transparent: true, opacity: 0.8 });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = 0.2; // Lơ lửng
+            pSystem.position.y = 0.2; 
             scene.add(pSystem);
         }
         createVoidPortal();
 
-        // --- 5. CLICK ĐỂ VỀ INDEX ---
+        // --- 6. CLICK ĐỂ VỀ INDEX ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -125,7 +132,7 @@
         window.addEventListener('click', onTouch);
         window.addEventListener('touchstart', onTouch);
 
-        // --- 6. ANIMATION ---
+        // --- 7. ANIMATION ---
         let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
         const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
@@ -139,16 +146,18 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // 1. XOAY VÒNG & HẠT (CHUYỂN ĐỘNG NHẸ)
-            if(portalRing) portalRing.rotation.z -= 0.02;
-            if(pSystem) pSystem.rotation.y += 0.005; // Xoay nhẹ nhàng cả cụm
+            // --- ĐÃ XÓA HOẠT ẢNH XOAY VÒNG RING ---
+            
+            // Xoay nhẹ cụm hạt đỏ
+            if(pSystem) pSystem.rotation.y += 0.005; 
 
-            // 2. MƯA RƠI
+            // ANIMATION MƯA TRÊN HUD (Rơi xuống trên màn hình 2D)
             const rPos = rainSystem.geometry.attributes.position.array;
+            const height = window.innerHeight;
             for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= 0.5; // Tốc độ rơi
-                if(rPos[i*3+1] < -5) { // Chạm đất
-                    rPos[i*3+1] = 20; // Lên đỉnh
+                rPos[i*3+1] -= 5; // Tốc độ rơi pixel/frame
+                if(rPos[i*3+1] < -height/2) { // Nếu rơi khỏi đáy màn hình
+                    rPos[i*3+1] = height/2; // Đưa lên đỉnh màn hình
                 }
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
@@ -165,10 +174,31 @@
                 if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
 
+            // RENDER KÉP QUAN TRỌNG:
+            // 1. Xóa màn hình
+            renderer.clear();
+            // 2. Vẽ cảnh 3D (Thành phố, sàn...)
             renderer.render(scene, camera);
+            // 3. Xóa bộ đệm độ sâu (để lớp sau vẽ đè lên lớp trước bất kể khoảng cách)
+            renderer.clearDepth();
+            // 4. Vẽ cảnh HUD (Mưa) lên trên cùng
+            renderer.render(sceneHUD, cameraHUD);
         }
         animate();
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        
+        // Cập nhật kích thước HUD khi resize màn hình
+        window.addEventListener('resize', () => { 
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            
+            cameraHUD.left = -window.innerWidth / 2;
+            cameraHUD.right = window.innerWidth / 2;
+            cameraHUD.top = window.innerHeight / 2;
+            cameraHUD.bottom = -window.innerHeight / 2;
+            cameraHUD.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+        });
     </script>
 </body>
 </html>
