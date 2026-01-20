@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon Room - Cozy Size</title>
+    <title>🌆 Neon City - Portal Hub</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone {
@@ -16,121 +16,141 @@
             flex-direction: column; color: #00f2ff; font-family: 'Courier New', monospace;
             font-size: 18px; z-index: 999; transition: opacity 1s;
         }
-        .spinner { border: 4px solid #00f2ff; border-top: 4px solid #ff0055;
-            border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        #guide {
+            position: absolute; top: 20px; left: 0; width: 100%; text-align: center;
+            color: #ff0055; font-family: monospace; font-weight: bold; pointer-events: none;
+            text-shadow: 0 0 5px #ff0055;
+        }
     </style>
 </head>
 <body>
-    <div id="loading">
-        <div class="spinner"></div>
-        <p>🌆 ĐANG THIẾT LẬP CĂN PHÒNG...</p>
-        <p>Vui lòng đợi...</p>
-    </div>
-
+    <div id="loading"><p>🔮 ĐANG MỞ CỔNG DỊCH CHUYỂN...</p></div>
+    <div id="guide">CHẠM VÀO HỐ ĐEN ĐỂ ĐẾN VŨ TRỤ SỐ</div>
     <div id="joystick-zone"></div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. KHỞI TẠO ENGINE ---
+        // --- 1. SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        // Sương mù gần hơn vì phòng nhỏ
         scene.fog = new THREE.Fog(0x000205, 5, 150); 
-
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 3); // Đứng gần tâm phòng hơn
+        camera.position.set(0, 1.6, 3);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. LOAD ẢNH 360 (SẮC NÉT) ---
+        // --- 2. MÔI TRƯỜNG ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
-                // Bán kính 100 là đủ nét cho phòng nhỏ
                 new THREE.SphereGeometry(100, 64, 32), 
                 new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
             );
             scene.add(sky);
-
             document.getElementById('loading').style.opacity = '0';
             setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
         });
 
-        // --- 3. CĂN PHÒNG PENTHOUSE NHỎ GỌN ---
-        
-        // *** THAY ĐỔI QUAN TRỌNG: GIẢM BÁN KÍNH ***
-        const balconyRadius = 8; // Giảm từ 40 xuống 8 (Đường kính 16m)
-
-        // A. Sàn kính tròn
+        // Sàn kính
         const floor = new THREE.Mesh(
-            new THREE.CircleGeometry(balconyRadius, 32),
+            new THREE.CircleGeometry(8, 32),
             new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
         );
         floor.rotation.x = -Math.PI / 2;
         floor.position.y = -0.1; 
         scene.add(floor);
 
-        // B. Lưới trang trí trên sàn
-        const gridHelper = new THREE.PolarGridHelper(balconyRadius, 8, 5, 32, 0x00f2ff, 0x00f2ff);
+        const gridHelper = new THREE.PolarGridHelper(8, 8, 5, 32, 0x00f2ff, 0x00f2ff);
         gridHelper.position.y = -0.09;
         gridHelper.material.opacity = 0.3;
         gridHelper.material.transparent = true;
         scene.add(gridHelper);
 
-        // C. Lan can phát sáng (Làm mỏng lại cho tinh tế)
-        // Tham số thứ 2 giảm từ 0.5 xuống 0.2
-        const railGeo = new THREE.TorusGeometry(balconyRadius, 0.2, 16, 100);
-        const railMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
-        const railing = new THREE.Mesh(railGeo, railMat);
-        railing.rotation.x = Math.PI / 2;
-        railing.position.y = 1.0; 
-        scene.add(railing);
+        // Lan can
+        const rail = new THREE.Mesh(
+            new THREE.TorusGeometry(8, 0.2, 16, 100), 
+            new THREE.MeshBasicMaterial({ color: 0x00f2ff })
+        );
+        rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- 4. CỘT DỮ LIỆU & BỤI SAO ---
-        const starsGeo = new THREE.BufferGeometry();
-        const starsCount = 800; // Giảm bớt sao vì góc nhìn hẹp hơn
-        const posArray = new Float32Array(starsCount * 3);
-        for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 200;
-        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, transparent: true, opacity: 0.5 }));
-        scene.add(starField);
+        // --- 3. HỐ ĐEN DỊCH CHUYỂN (PORTAL) ---
+        let portalRing, portalCore;
+        function createBlackHole() {
+            // Lõi đen (Hố sâu)
+            portalCore = new THREE.Mesh(
+                new THREE.CircleGeometry(1.5, 32),
+                new THREE.MeshBasicMaterial({ color: 0x000000 })
+            );
+            portalCore.rotation.x = -Math.PI / 2;
+            portalCore.position.y = -0.05; // Nằm sát sàn
+            scene.add(portalCore);
 
-        function addPillar(x, z, color, h) {
-            // Làm cột nhỏ lại một chút cho cân xứng với phòng
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, h, 0.6), new THREE.MeshBasicMaterial({ color, wireframe: true }));
-            mesh.position.set(x, h/2 - 0.1, z);
-            scene.add(mesh);
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 16, 50), new THREE.MeshBasicMaterial({ color }));
-            ring.rotation.x = Math.PI/2;
-            ring.position.set(x, 0, z);
-            scene.add(ring);
+            // Vòng năng lượng xoáy (Màu tím đỏ)
+            const ringGeo = new THREE.RingGeometry(1.5, 2.2, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ 
+                color: 0xff0055, side: THREE.DoubleSide, transparent: true, opacity: 0.8, wireframe: true 
+            });
+            portalRing = new THREE.Mesh(ringGeo, ringMat);
+            portalRing.rotation.x = -Math.PI / 2;
+            portalRing.position.y = -0.04;
+            scene.add(portalRing);
+
+            // Hiệu ứng hạt hút vào hố đen
+            const particlesGeo = new THREE.BufferGeometry();
+            const pCount = 200;
+            const pArr = new Float32Array(pCount * 3);
+            for(let i=0; i<pCount*3; i++) pArr[i] = (Math.random() - 0.5) * 5;
+            particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
+            const pMat = new THREE.PointsMaterial({ color: 0xff0055, size: 0.05 });
+            const pSystem = new THREE.Points(particlesGeo, pMat);
+            pSystem.position.y = 0.5;
+            scene.add(pSystem);
         }
-        
-        // *** DỜI VỊ TRÍ CỘT VÀO GẦN HƠN ***
-        addPillar(-3, -3, 0x00f2ff, 7); // Skincare
-        addPillar(3, -3, 0xff0055, 5);  // Health
-        addPillar(0, -5, 0xffff00, 9);  // Total
+        createBlackHole();
+
+        // --- 4. TƯƠNG TÁC CLICK ĐỂ DỊCH CHUYỂN ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onTouch(event) {
+            // Tính tọa độ chuột/ngón tay
+            let clientX, clientY;
+            if (event.changedTouches) {
+                clientX = event.changedTouches[0].clientX;
+                clientY = event.changedTouches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(portalCore);
+
+            if (intersects.length > 0) {
+                // HIỆU ỨNG CHUYỂN CẢNH
+                document.body.style.transition = "opacity 1s";
+                document.body.style.opacity = "0"; // Mờ dần màn hình
+                setTimeout(() => {
+                    window.location.href = 'room4.html'; // CHUYỂN SANG FILE VŨ TRỤ
+                }, 1000);
+            }
+        }
+        window.addEventListener('click', onTouch);
+        window.addEventListener('touchstart', onTouch);
 
         // --- 5. ĐIỀU KHIỂN ---
-        let moveState = { f: 0, r: 0 };
-        let look = { lat: 0, lon: -90 };
-        let interact = false;
-        let px, py, plon, plat;
-
+        let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
         const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
         joy.on('end', () => { moveState = { f: 0, r: 0 }; });
@@ -145,37 +165,25 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
+            // Xoay hố đen
+            if(portalRing) portalRing.rotation.z -= 0.05;
+
             look.lat = Math.max(-85, Math.min(85, look.lat));
             const phi = THREE.MathUtils.degToRad(90 - look.lat);
             const theta = THREE.MathUtils.degToRad(look.lon);
-            const target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
-            camera.lookAt(target);
+            camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
 
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 8 * dt; // Giảm tốc độ một chút cho dễ điều khiển trong phòng nhỏ
+                const speed = 8 * dt; 
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                
-                const nextPos = camera.position.clone();
-                nextPos.addScaledVector(dir, moveState.f * speed);
-                nextPos.addScaledVector(side, -moveState.r * speed);
-
-                // Giới hạn hình tròn (Bán kính ban công - 1m an toàn)
-                if (nextPos.length() < balconyRadius - 1) {
-                    camera.position.copy(nextPos);
-                }
+                const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
+                if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
-
-            starField.rotation.y += 0.0002;
             renderer.render(scene, camera);
         }
         animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
