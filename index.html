@@ -30,6 +30,8 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // Quan trọng: Cho phép renderer xóa buffer thủ công để vẽ lớp HUD
+        renderer.autoClear = false; 
         document.body.appendChild(renderer.domElement);
 
         // Sàn vô hình
@@ -37,39 +39,33 @@
         floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
         scene.add(floorBase);
 
-        // --- 2. HỐ ĐEN (COPY TỪ CODE THAM KHẢO + CHỈNH MÀU XANH) ---
-        let portalCore, portalRing, pSystem;
+        // --- 2. HỐ ĐEN & HẠT LƠ LỬNG (ĐÃ XÓA VÒNG XOAY) ---
+        let portalCore, pSystem; // Bỏ biến portalRing
         function createEnergyPortal() {
             // Lõi đen
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
             scene.add(portalCore);
 
-            // Vòng năng lượng
-            const ringGeo = new THREE.RingGeometry(1.5, 2.2, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
-            portalRing = new THREE.Mesh(ringGeo, ringMat);
-            portalRing.rotation.x = -Math.PI / 2; portalRing.position.y = -0.38;
-            scene.add(portalRing);
+            // --- ĐÃ XÓA ĐOẠN CODE TẠO VÒNG RING Ở ĐÂY ---
 
-            // HẠT TĨNH (STATIC PARTICLES) - COPY LOGIC THAM KHẢO
+            // HẠT TĨNH (Cụm mây hạt xanh)
             const particlesGeo = new THREE.BufferGeometry();
-            const pCount = 300; // Số lượng hạt
+            const pCount = 300;
             const pArr = new Float32Array(pCount * 3);
             for(let i=0; i<pCount*3; i++) {
-                pArr[i] = (Math.random() - 0.5) * 4; // Rải ngẫu nhiên quanh hố
+                pArr[i] = (Math.random() - 0.5) * 4; 
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
             
-            // Màu xanh Cyan
-            const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8 });
+            const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = -0.2; // Nằm thấp trên hố đen
+            pSystem.position.y = -0.2; 
             scene.add(pSystem);
         }
         createEnergyPortal();
 
-        // --- 3. BỤI VŨ TRỤ (MÔI TRƯỜNG) ---
+        // --- 3. BỤI VŨ TRỤ ---
         const starsGeo = new THREE.BufferGeometry();
         const starsCount = 4000;
         const posArray = new Float32Array(starsCount * 3);
@@ -118,11 +114,10 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // 1. XOAY VÒNG NĂNG LƯỢNG
-            if(portalRing) portalRing.rotation.z -= 0.02;
+            // --- ĐÃ XÓA HOẠT ẢNH XOAY VÒNG RING ---
 
-            // 2. XOAY NHẸ ĐÁM MÂY HẠT (CHUYỂN ĐỘNG NHẸ)
-            if(pSystem) pSystem.rotation.y += 0.005; // Chỉ xoay, không phun
+            // Xoay nhẹ đám mây hạt
+            if(pSystem) pSystem.rotation.y += 0.005;
 
             // Camera
             look.lat = Math.max(-85, Math.min(85, look.lat));
@@ -144,10 +139,16 @@
             }
             starField.geometry.attributes.position.needsUpdate = true;
 
+            // RENDER KÉP (Cho phép vẽ HUD nếu cần sau này)
+            renderer.clear();
             renderer.render(scene, camera);
         }
         animate();
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        window.addEventListener('resize', () => { 
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+        });
     </script>
 </body>
 </html>
