@@ -36,7 +36,7 @@
         floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
         scene.add(floorBase);
 
-        // --- 2. HỐ ĐEN (CẤU TRÚC CHUẨN - KHÔNG VÒNG) ---
+        // --- 2. HỐ ĐEN & HẠT TỰ NHIÊN (FIXED) ---
         let portalCore, pSystem;
         function createEnergyPortal() {
             // Lõi đen
@@ -44,22 +44,39 @@
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
             scene.add(portalCore);
 
-            // *** KHÔNG CÓ VÒNG RING ***
-
-            // HẠT NĂNG LƯỢNG (Copy y chang logic file tham khảo)
+            // TẠO HẠT DẠNG ĐÁM MÂY (KHÔNG PHẢI HÌNH HỘP)
             const particlesGeo = new THREE.BufferGeometry();
-            const pCount = 300; 
-            const pArr = new Float32Array(pCount * 3);
-            for(let i=0; i<pCount*3; i++) {
-                // Công thức rải hạt tự nhiên bạn thích:
-                pArr[i] = (Math.random() - 0.5) * 4; 
+            const pCount = 120; // Số lượng ít, thưa thớt
+            const pPos = new Float32Array(pCount * 3);
+            const pRnd = []; // Lưu giá trị ngẫu nhiên để hạt dao động riêng lẻ
+
+            for(let i=0; i<pCount; i++) {
+                // Thuật toán hình tròn: Giúp hạt tỏa ra đều, không bị vuông vức
+                const radius = Math.random() * 2.5; // Bán kính phân tán tối đa 2.5m
+                const angle = Math.random() * Math.PI * 2; // Góc ngẫu nhiên 360 độ
+
+                // Tập trung nhiều ở tâm, ít ở xa (Hiệu ứng tụ khí)
+                const distance = Math.pow(Math.random(), 2) * radius; 
+
+                pPos[i*3] = Math.cos(angle) * distance; // X
+                pPos[i*3+1] = Math.random() * 1.2;      // Y (Độ cao lơ lửng ngẫu nhiên)
+                pPos[i*3+2] = Math.sin(angle) * distance; // Z
+
+                pRnd.push(Math.random() * 100); // Pha dao động riêng
             }
-            particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
+            particlesGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
             
             // Màu Xanh Neon
-            const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8 });
+            const pMat = new THREE.PointsMaterial({ 
+                color: 0x00f2ff, 
+                size: 0.1, // Hạt nhỏ vừa phải
+                transparent: true, 
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending 
+            });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = -0.2; // Đặt thấp sát hố đen
+            pSystem.position.y = -0.2; 
+            pSystem.userData = { randoms: pRnd }; // Lưu dữ liệu dao động
             scene.add(pSystem);
         }
         createEnergyPortal();
@@ -112,9 +129,23 @@
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
+            const time = Date.now() * 0.001;
 
-            // Xoay nhẹ đám mây hạt (giữ nguyên vị trí các hạt, chỉ xoay trục Y)
-            if(pSystem) pSystem.rotation.y += 0.005;
+            // ANIMATION HẠT TỰ NHIÊN
+            if(pSystem) {
+                // 1. Xoay cực chậm (không quay chóng mặt)
+                pSystem.rotation.y += 0.002;
+
+                // 2. Dao động từng hạt (bồng bềnh)
+                const positions = pSystem.geometry.attributes.position.array;
+                const randoms = pSystem.userData.randoms;
+                
+                for(let i=0; i<120; i++) {
+                    // Mỗi hạt nhấp nhô lên xuống độc lập
+                    positions[i*3+1] += Math.sin(time + randoms[i]) * 0.003;
+                }
+                pSystem.geometry.attributes.position.needsUpdate = true;
+            }
 
             look.lat = Math.max(-85, Math.min(85, look.lat));
             const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
