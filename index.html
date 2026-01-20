@@ -30,11 +30,9 @@
 
         // --- 1. KHỞI TẠO ENGINE ---
         const scene = new THREE.Scene();
-        // Nới rộng sương mù để hòa quyện với bầu trời thành phố
         scene.fog = new THREE.Fog(0x000000, 10, 500); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        // TẦM MẮT NÂNG LÊN 3.0m (Cao hơn để nhìn rõ phố phường bên dưới)
         camera.position.set(0, 3.0, 10); 
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -42,7 +40,7 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Ánh sáng Neon môi trường (hơi ám xanh tím cho hợp với thành phố)
+        // Ánh sáng
         const ambientLight = new THREE.AmbientLight(0x442266, 2); 
         scene.add(ambientLight);
         const sunLight = new THREE.PointLight(0xffffff, 3, 500);
@@ -51,8 +49,9 @@
 
         // --- 2. PHONG CẢNH THÀNH PHỐ (NEON CITY 360) ---
         const loader = new THREE.TextureLoader();
-        // Chú ý: Đảm bảo file ảnh của bạn tên là neoncity0.webp nằm cùng thư mục
-        loader.load('neoncity0.webp', function(texture) {
+
+        // ✅ DÒNG ĐÃ SỬA ĐÚNG
+        loader.load('./neoncity0.webp', function(texture) {
             const skyGeo = new THREE.SphereGeometry(800, 60, 40);
             const skyMat = new THREE.MeshBasicMaterial({ 
                 map: texture, 
@@ -83,7 +82,7 @@
         createPlanet(8, 80, 20, -100, 0xff6622);  
         createPlanet(5, -40, 60, -60, 0x88ff88);    
 
-        // --- 4. VẬT THỂ DỮ LIỆU & BỤI ---
+        // --- 4. SAO & BỤI ---
         const starsGeo = new THREE.BufferGeometry();
         const starsCount = 4000; 
         const posArray = new Float32Array(starsCount * 3);
@@ -92,25 +91,6 @@
         const starsMat = new THREE.PointsMaterial({ size: 0.04, color: 0x00f2ff, transparent: true, opacity: 0.6 });
         const starField = new THREE.Points(starsGeo, starsMat);
         scene.add(starField);
-
-        function addPillar(x, z, color, h) {
-            const geo = new THREE.CylinderGeometry(0.4, 0.4, h, 16);
-            const mat = new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.8 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, h/2, z);
-            scene.add(mesh);
-            
-            const ring = new THREE.Mesh(
-                new THREE.TorusGeometry(0.7, 0.03, 16, 100),
-                new THREE.MeshBasicMaterial({ color: color })
-            );
-            ring.rotation.x = Math.PI/2;
-            ring.position.set(x, 0.05, z);
-            scene.add(ring);
-        }
-        addPillar(-6, -6, 0x00f2ff, 7); // Skincare Pillar
-        addPillar(6, -6, 0xff0055, 5);  // Health Pillar
-        addPillar(0, -15, 0xffff00, 10); // Total Assets Pillar
 
         // --- 5. ĐIỀU KHIỂN ---
         let moveState = { f: 0, r: 0 };
@@ -154,10 +134,10 @@
             camera.lookAt(target);
 
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 18 * dt; // Tốc độ nhanh hơn để khám phá thành phố
+                const speed = 18 * dt;
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
-                dir.y = 0; // Giữ thăng bằng trên mặt phẳng ảo
+                dir.y = 0;
                 dir.normalize();
                 
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
