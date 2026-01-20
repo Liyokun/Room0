@@ -22,65 +22,62 @@
 
         // --- 1. VŨ TRỤ VÔ TẬN ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020205); 
-        // Sương mù xa để không che mất sao
+        scene.background = new THREE.Color(0x020205);
         scene.fog = new THREE.Fog(0x020205, 30, 100);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 5); 
+        camera.position.set(0, 1.6, 5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Sàn vô hình (Để đi lại)
+        // Sàn vô hình
         const floorBase = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
         floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
         scene.add(floorBase);
 
-        // --- 2. HỐ ĐEN & HẠT NĂNG LƯỢNG (FIXED: BẮN TUNG RA) ---
+        // --- 2. HỐ ĐEN & HẠT NĂNG LƯỢNG (LƠ LỬNG) ---
         let portalCore, particlesSystem;
         function createEnergyPortal() {
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(2, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
             scene.add(portalCore);
 
-            // HỆ THỐNG HẠT MỚI: Bắn tung ra xung quanh
             const pCount = 400;
             const pGeo = new THREE.BufferGeometry();
             const pPos = new Float32Array(pCount * 3);
-            const pVel = []; 
+            const pVel = [];
 
             for(let i=0; i<pCount; i++) {
-                pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0; // Xuất phát từ tâm
+                // Khởi tạo vị trí ngẫu nhiên trong một vùng không gian xung quanh cổng
+                pPos[i*3] = (Math.random() - 0.5) * 4; // x: -2 đến 2
+                pPos[i*3+1] = Math.random() * 2;       // y: 0 đến 2
+                pPos[i*3+2] = (Math.random() - 0.5) * 4; // z: -2 đến 2
                 
-                // Tính toán hướng bắn ra ngẫu nhiên theo vòng tròn
-                const angle = Math.random() * Math.PI * 2;
-                // Tốc độ ngẫu nhiên
-                const speed = Math.random() * 0.08 + 0.02; 
-                
+                // Vận tốc rất nhỏ để tạo hiệu ứng lơ lửng
                 pVel.push({
-                    x: Math.cos(angle) * speed, // Bay ra theo trục X
-                    y: Math.random() * 0.03,    // Bay hơi nhích lên trên
-                    z: Math.sin(angle) * speed  // Bay ra theo trục Z
+                    x: (Math.random() - 0.5) * 0.01,
+                    y: (Math.random() - 0.5) * 0.01,
+                    z: (Math.random() - 0.5) * 0.01
                 });
             }
             pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
             
             const pMat = new THREE.PointsMaterial({
-                color: 0x00f2ff, // Màu sáng Cyan (Đại diện City)
-                size: 0.1,       // Hạt to hơn chút cho rõ
-                transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending
+                color: 0x00f2ff, // Màu sáng Cyan
+                size: 0.08,
+                transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
             });
 
             particlesSystem = new THREE.Points(pGeo, pMat);
-            particlesSystem.position.set(0, -0.35, 0); 
-            particlesSystem.userData = { velocities: pVel }; 
+            particlesSystem.position.set(0, -0.3, 0);
+            particlesSystem.userData = { velocities: pVel };
             scene.add(particlesSystem);
         }
         createEnergyPortal();
 
-        // --- 3. BÃO BỤI SỐ (MÔI TRƯỜNG) ---
+        // --- 3. BÃO BỤI SỐ ---
         const starsGeo = new THREE.BufferGeometry();
         const starsCount = 4000;
         const posArray = new Float32Array(starsCount * 3);
@@ -107,7 +104,7 @@
             raycaster.setFromCamera(mouse, camera);
             if (raycaster.intersectObject(portalCore).length > 0) {
                 document.body.style.transition = "transform 1s, opacity 1s";
-                document.body.style.transform = "scale(3)"; // Hiệu ứng hút mạnh hơn
+                document.body.style.transform = "scale(3)";
                 document.body.style.opacity = "0";
                 setTimeout(() => { window.location.href = 'city.html'; }, 1000);
             }
@@ -132,33 +129,32 @@
             const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
             camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 8 * dt; 
+                const speed = 8 * dt;
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
                 const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
                 if(nextPos.length() < 50) camera.position.copy(nextPos);
             }
-            
-            // ANIMATION HẠT CỔNG (Bay ra xa rồi reset)
+
+            // ANIMATION HẠT CỔNG (Lơ lửng trong vùng giới hạn)
             const pPos = particlesSystem.geometry.attributes.position.array;
             const pVel = particlesSystem.userData.velocities;
             for(let i=0; i < pVel.length; i++) {
                 pPos[i*3] += pVel[i].x;
                 pPos[i*3+1] += pVel[i].y;
                 pPos[i*3+2] += pVel[i].z;
-                // Tính khoảng cách từ tâm
-                const dist = Math.sqrt(pPos[i*3]**2 + pPos[i*3+2]**2);
-                // Nếu bay xa quá 6 mét hoặc cao quá 3 mét thì reset
-                if(dist > 6 || pPos[i*3+1] > 3) {
-                    pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0;
-                }
+
+                // Giữ hạt trong một hộp vô hình, hạt chạm biên sẽ nảy lại
+                if(Math.abs(pPos[i*3]) > 2) pVel[i].x *= -1;
+                if(pPos[i*3+1] < 0 || pPos[i*3+1] > 2) pVel[i].y *= -1;
+                if(Math.abs(pPos[i*3+2]) > 2) pVel[i].z *= -1;
             }
             particlesSystem.geometry.attributes.position.needsUpdate = true;
 
             // ANIMATION BỤI VŨ TRỤ
             const pos = starField.geometry.attributes.position.array;
             for(let i=0; i < starsCount; i++) {
-                pos[i*3 + 1] -= velocityArray[i]; 
+                pos[i*3 + 1] -= velocityArray[i];
                 if (pos[i*3 + 1] < -40) pos[i*3 + 1] = 40;
             }
             starField.geometry.attributes.position.needsUpdate = true;
