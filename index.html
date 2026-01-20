@@ -2,41 +2,164 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon City Test</title>
-    <style>body { margin:0; overflow:hidden; background:#000; }</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🌆 Neon City FPS Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
+        #joystick-zone {
+            position: absolute; bottom: 50px; left: 50px;
+            width: 120px; height: 120px; z-index: 100; opacity: 0.8;
+        }
+        #loading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; align-items: center; justify-content: center;
+            flex-direction: column; color: #00f2ff; font-family: 'Courier New', monospace;
+            font-size: 18px; z-index: 999; transition: opacity 1s;
+        }
+        .spinner { border: 4px solid #00f2ff; border-top: 4px solid #ff0055;
+            border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 1.6, 5);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>🌆 ĐANG KHỞI ĐỘNG NEON CITY...</p>
+        <p>Đang load khung cảnh xung quanh...</p>
+    </div>
 
-    const loader = new THREE.TextureLoader();
-    loader.load('neoncity0.webp', texture => {
-        const sky = new THREE.Mesh(
-            new THREE.SphereGeometry(500, 32, 16),
-            new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
-        );
-        scene.add(sky);
-        alert('Ảnh neon city đã load! Xoay chuột để nhìn quanh.');
-    }, undefined, err => alert('Lỗi load ảnh: ' + err.message));
+    <div id="joystick-zone"></div>
 
-    function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene, camera);
-    }
-    animate();
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- KHỞI TẠO ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000205);
+        scene.fog = new THREE.Fog(0x000205, 20, 800); // Sương mù xa hơn để mở rộng không gian
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 1.6, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-</script>
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // --- LOAD KHUNG CẢNH 360° (neoncity0.webp cùng thư mục) ---
+        const loader = new THREE.TextureLoader();
+        loader.load('neoncity0.webp', (texture) => {
+            const sky = new THREE.Mesh(
+                new THREE.SphereGeometry(800, 60, 40), // Quả cầu lớn bao quanh
+                new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+            );
+            scene.add(sky);
+
+            // Ẩn loading khi load xong
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
+        }, undefined, (err) => {
+            console.error('Lỗi load ảnh:', err);
+            document.querySelector('#loading p:last-child').textContent = 'Lỗi load ảnh (kiểm tra file neoncity0.webp)';
+        });
+
+        // --- SÀN NHẸ + ĐÁY ĐEN (không tường nữa để thấy khung cảnh xung quanh) ---
+        const floorSize = 400; // Rộng lớn hơn
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(floorSize, floorSize),
+            new THREE.MeshBasicMaterial({ color: 0x010103 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.01;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(floorSize, 50, 0x00f2ff, 0x00f2ff);
+        grid.material.opacity = 0.2;
+        grid.material.transparent = true;
+        scene.add(grid);
+
+        // --- BỤI SAO + TRỤ NEON (giữ nguyên để sinh động) ---
+        const starsGeo = new THREE.BufferGeometry();
+        const starsCount = 2000;
+        const posArray = new Float32Array(starsCount * 3);
+        for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 400;
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.05, color: 0xffffff, transparent: true, opacity: 0.6 }));
+        scene.add(starField);
+
+        function addPillar(x, z, color, h) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), new THREE.MeshBasicMaterial({ color, wireframe: true }));
+            mesh.position.set(x, h/2, z);
+            scene.add(mesh);
+
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.05, 16, 100), new THREE.MeshBasicMaterial({ color }));
+            ring.rotation.x = Math.PI/2;
+            ring.position.set(x, 0.05, z);
+            scene.add(ring);
+        }
+        addPillar(-20, -20, 0x00f2ff, 12);
+        addPillar(20, -20, 0xff0055, 10);
+        addPillar(0, -40, 0xffff00, 15);
+
+        // --- ĐIỀU KHIỂN (giữ nguyên siêu mượt) ---
+        let moveState = { f: 0, r: 0 };
+        let look = { lat: 0, lon: -90 };
+        let interact = false;
+        let px, py, plon, plat;
+
+        const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
+        joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
+        joy.on('end', () => { moveState = { f: 0, r: 0 }; });
+
+        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; }});
+        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; }});
+        document.addEventListener('pointerup', () => interact = false);
+
+        // --- VÒNG LẶP ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            look.lat = Math.max(-85, Math.min(85, look.lat));
+            const phi = THREE.MathUtils.degToRad(90 - look.lat);
+            const theta = THREE.MathUtils.degToRad(look.lon);
+            const target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
+            camera.lookAt(target);
+
+            if (moveState.f !== 0 || moveState.r !== 0) {
+                const speed = 15 * dt; // Nhanh hơn tí cho không gian rộng
+                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+                camera.position.addScaledVector(dir, moveState.f * speed);
+                camera.position.addScaledVector(side, -moveState.r * speed);
+            }
+
+            // Giới hạn rộng lớn (có thể bỏ luôn nếu muốn vô tận)
+            const lim = 180;
+            camera.position.x = Math.max(-lim, Math.min(lim, camera.position.x));
+            camera.position.z = Math.max(-lim, Math.min(lim, camera.position.z));
+
+            starField.rotation.y += 0.0002;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
