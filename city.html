@@ -25,10 +25,9 @@
         // --- 1. SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        // FIXED: Đẩy sương mù ra rất xa (bắt đầu từ 80m, kết thúc 250m)
-        // Ảnh thành phố ở 100m nên sẽ nhìn rõ, chỉ mờ nhẹ ở chân trời.
-        scene.fog = new THREE.Fog(0x000205, 80, 250); 
-        
+        // Đẩy sương mù ra xa để không che khuất thành phố
+        scene.fog = new THREE.Fog(0x000205, 50, 300);
+
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.6, 3);
 
@@ -40,7 +39,7 @@
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
-                new THREE.SphereGeometry(100, 64, 32), 
+                new THREE.SphereGeometry(100, 64, 32),
                 new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
             );
             scene.add(sky);
@@ -56,64 +55,60 @@
         const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
         rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- FIXED: HỆ THỐNG MƯA RỘNG KHẮP ---
-        const rainCount = 4000; // Tăng số lượng mưa
+        // --- HỆ THỐNG MƯA RỘNG KHẮP ---
+        const rainCount = 4000;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
         const rainVel = [];
 
         for(let i=0; i<rainCount; i++) {
-            // FIXED: Rải mưa rộng ra 200m (gấp 5 lần trước) để bao phủ thành phố
-            rainPos[i*3] = (Math.random() - 0.5) * 200; // X rộng
-            rainPos[i*3+1] = Math.random() * 100 + 50;  // Y cao (để rơi lâu)
-            rainPos[i*3+2] = (Math.random() - 0.5) * 200; // Z rộng
-            rainVel.push(Math.random() * 0.5 + 0.5); // Tốc độ rơi
+            rainPos[i*3] = (Math.random() - 0.5) * 200;
+            rainPos[i*3+1] = Math.random() * 100 + 50;
+            rainPos[i*3+2] = (Math.random() - 0.5) * 200;
+            rainVel.push(Math.random() * 0.5 + 0.5);
         }
         rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
         const rainMat = new THREE.PointsMaterial({
             color: 0xaaaaaa,
-            size: 0.08, // Hạt mưa rõ hơn xíu
+            size: 0.05,
             transparent: true,
             opacity: 0.5
         });
         const rainSystem = new THREE.Points(rainGeo, rainMat);
         scene.add(rainSystem);
 
-        // --- 3. HỐ ĐEN & HẠT NĂNG LƯỢNG TỐI (FIXED: BẮN TUNG RA) ---
+        // --- 3. HỐ ĐEN & HẠT NĂNG LƯỢNG TỐI (LƠ LỬNG) ---
         let portalCore, particlesSystem;
         function createVoidPortal() {
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; scene.add(portalCore);
 
-            // HỆ THỐNG HẠT MỚI: Bắn tung ra (Màu Tối)
             const pCount = 400;
             const pGeo = new THREE.BufferGeometry();
             const pPos = new Float32Array(pCount * 3);
             const pVel = [];
 
             for(let i=0; i<pCount; i++) {
-                pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0;
-                const angle = Math.random() * Math.PI * 2;
-                // Tốc độ chậm hơn hạt sáng một chút cho cảm giác "nặng"
-                const speed = Math.random() * 0.05 + 0.01; 
+                pPos[i*3] = (Math.random() - 0.5) * 3;
+                pPos[i*3+1] = Math.random() * 1.5;
+                pPos[i*3+2] = (Math.random() - 0.5) * 3;
                 pVel.push({
-                    x: Math.cos(angle) * speed,
-                    y: Math.random() * 0.02,
-                    z: Math.sin(angle) * speed
+                    x: (Math.random() - 0.5) * 0.01,
+                    y: (Math.random() - 0.5) * 0.01,
+                    z: (Math.random() - 0.5) * 0.01
                 });
             }
             pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
             
             const pMat = new THREE.PointsMaterial({
-                color: 0x4b0082, // Màu Tím đậm (Đại diện Vũ trụ tối)
-                size: 0.1,
+                color: 0x4b0082, // Màu Tím đậm
+                size: 0.08,
                 transparent: true, opacity: 0.9
-                // Không dùng AdditiveBlending để giữ màu tối
             });
 
             particlesSystem = new THREE.Points(pGeo, pMat);
-            particlesSystem.position.set(0, -0.04, 0); 
-            particlesSystem.userData = { velocities: pVel }; 
+            particlesSystem.position.set(0, -0.04, 0);
+            particlesSystem.userData = { velocities: pVel };
             scene.add(particlesSystem);
         }
         createVoidPortal();
@@ -129,7 +124,7 @@
             raycaster.setFromCamera(mouse, camera);
             if (raycaster.intersectObject(portalCore).length > 0) {
                 document.body.style.transition = "transform 1s, opacity 1s";
-                document.body.style.transform = "scale(0.1)"; // Thu nhỏ
+                document.body.style.transform = "scale(0.1)";
                 document.body.style.opacity = "0";
                 setTimeout(() => { window.location.href = 'index.html'; }, 1000);
             }
@@ -154,34 +149,34 @@
             const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
             camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 8 * dt; 
+                const speed = 8 * dt;
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
                 const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
                 if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
 
-            // FIXED: ANIMATION MƯA RƠI TỪ RẤT CAO
+            // ANIMATION MƯA
             const rPos = rainSystem.geometry.attributes.position.array;
             for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= rainVel[i]; 
-                if(rPos[i*3+1] < -50) { // Rơi xuống sâu dưới sàn
-                    rPos[i*3+1] = 150; // Quay lại tít trên cao
+                rPos[i*3+1] -= rainVel[i];
+                if(rPos[i*3+1] < -50) {
+                    rPos[i*3+1] = 150;
                 }
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
 
-            // ANIMATION HẠT CỔNG (Bay ra xa rồi reset)
+            // ANIMATION HẠT CỔNG (Lơ lửng)
             const pPos = particlesSystem.geometry.attributes.position.array;
             const pVel = particlesSystem.userData.velocities;
             for(let i=0; i < pVel.length; i++) {
                 pPos[i*3] += pVel[i].x;
                 pPos[i*3+1] += pVel[i].y;
                 pPos[i*3+2] += pVel[i].z;
-                const dist = Math.sqrt(pPos[i*3]**2 + pPos[i*3+2]**2);
-                if(dist > 4 || pPos[i*3+1] > 2) { // Bay xa 4m thì reset
-                    pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0;
-                }
+
+                if(Math.abs(pPos[i*3]) > 1.5) pVel[i].x *= -1;
+                if(pPos[i*3+1] < 0 || pPos[i*3+1] > 1.5) pVel[i].y *= -1;
+                if(Math.abs(pPos[i*3+2]) > 1.5) pVel[i].z *= -1;
             }
             particlesSystem.geometry.attributes.position.needsUpdate = true;
 
