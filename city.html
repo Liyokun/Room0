@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🌆 Neon City - Rain & Void</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
+        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 100; opacity: 0.8; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; transition: opacity 1s; }
+    </style>
+</head>
+<body>
+    <div id="loading"></div>
+    <div id="joystick-zone"></div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 1. SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000205);
+        scene.fog = new THREE.Fog(0x000205, 5, 100); 
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.6, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- 2. MÔI TRƯỜNG & MƯA ---
+        const loader = new THREE.TextureLoader();
+        loader.load('neoncity0.webp', (texture) => {
+            const sky = new THREE.Mesh(
+                new THREE.SphereGeometry(100, 64, 32), 
+                new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+            );
+            scene.add(sky);
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
+        });
+
+        // Sàn kính
+        const floor = new THREE.Mesh(
+            new THREE.CircleGeometry(8, 32),
+            new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+        );
+        floor.rotation.x = -Math.PI / 2; floor.position.y = -0.1; scene.add(floor);
+
+        const gridHelper = new THREE.PolarGridHelper(8, 8, 5, 32, 0x00f2ff, 0x00f2ff);
+        gridHelper.position.y = -0.09; gridHelper.material.opacity = 0.3; gridHelper.material.transparent = true; scene.add(gridHelper);
+
+        const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
+        rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
+
+        // --- HỆ THỐNG MƯA (RAIN SYSTEM) ---
+        const rainCount = 3000;
+        const rainGeo = new THREE.BufferGeometry();
+        const rainPos = new Float32Array(rainCount * 3);
+        const rainVel = [];
+
+        for(let i=0; i<rainCount; i++) {
+            rainPos[i*3] = (Math.random() - 0.5) * 40; // X (Rải rộng)
+            rainPos[i*3+1] = Math.random() * 20;       // Y (Độ cao)
+            rainPos[i*3+2] = (Math.random() - 0.5) * 40; // Z
+            rainVel.push(Math.random() * 0.3 + 0.2); // Tốc độ rơi nhanh
+        }
+        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+        const rainMat = new THREE.PointsMaterial({
+            color: 0xaaaaaa,
+            size: 0.05, // Mưa nhỏ nhẹ
+            transparent: true,
+            opacity: 0.6
+        });
+        const rainSystem = new THREE.Points(rainGeo, rainMat);
+        scene.add(rainSystem);
+
+        // --- 3. HỐ ĐEN (CỔNG VỀ VŨ TRỤ) ---
+        let portalCore, particlesSystem;
+        function createVoidPortal() {
+            // Lõi đen
+            portalCore = new THREE.Mesh(
+                new THREE.CircleGeometry(1.5, 32),
+                new THREE.MeshBasicMaterial({ color: 0x000000 })
+            );
+            portalCore.rotation.x = -Math.PI / 2;
+            portalCore.position.y = -0.05; 
+            scene.add(portalCore);
+
+            // HẠT NĂNG LƯỢNG TỐI (Dark/Purple Particles)
+            // Màu TỐI đại diện cho vũ trụ bên kia
+            const pCount = 300;
+            const pGeo = new THREE.BufferGeometry();
+            const pPos = new Float32Array(pCount * 3);
+            const pVel = [];
+
+            for(let i=0; i<pCount; i++) {
+                pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 0.04 + 0.01;
+                pVel.push({
+                    x: Math.cos(angle) * speed,
+                    y: (Math.random() - 0.5) * 0.02 + 0.05,
+                    z: Math.sin(angle) * speed
+                });
+            }
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+            
+            const pMat = new THREE.PointsMaterial({
+                color: 0x4b0082, // Màu Tím chàm đậm (Dark Indigo)
+                size: 0.08,
+                transparent: true,
+                opacity: 0.9,
+                // Không dùng AdditiveBlending để giữ màu tối
+            });
+
+            particlesSystem = new THREE.Points(pGeo, pMat);
+            particlesSystem.position.set(0, -0.04, 0); 
+            particlesSystem.userData = { velocities: pVel }; 
+            scene.add(particlesSystem);
+        }
+        createVoidPortal();
+
+        // --- 4. TƯƠNG TÁC CLICK (KHÔNG CÓ HƯỚNG DẪN) ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onTouch(event) {
+            let clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX;
+            let clientY = event.changedTouches ? event.changedTouches[0].clientY : event.clientY;
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            if (raycaster.intersectObject(portalCore).length > 0) {
+                // Hiệu ứng hút vào
+                document.body.style.transition = "transform 1s, opacity 1s";
+                document.body.style.transform = "scale(0.1)"; // Thu nhỏ lại
+                document.body.style.opacity = "0";
+                setTimeout(() => {
+                    window.location.href = 'index.html'; // QUAY VỀ VŨ TRỤ
+                }, 1000);
+            }
+        }
+        window.addEventListener('click', onTouch);
+        window.addEventListener('touchstart', onTouch);
+
+        // --- 5. ĐIỀU KHIỂN ---
+        let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
+        const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
+        joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
+        joy.on('end', () => { moveState = { f: 0, r: 0 }; });
+        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; }});
+        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; }});
+        document.addEventListener('pointerup', () => interact = false);
+
+        // --- 6. ANIMATION ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            look.lat = Math.max(-85, Math.min(85, look.lat));
+            const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
+            camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
+            if (moveState.f !== 0 || moveState.r !== 0) {
+                const speed = 8 * dt; 
+                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+                const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
+                if (nextPos.length() < 7) camera.position.copy(nextPos);
+            }
+
+            // ANIMATION MƯA
+            const rPos = rainSystem.geometry.attributes.position.array;
+            for(let i=0; i<rainCount; i++) {
+                rPos[i*3+1] -= rainVel[i]; // Rơi xuống
+                if(rPos[i*3+1] < -10) { // Nếu chạm đáy
+                    rPos[i*3+1] = 20; // Quay lại đỉnh
+                }
+            }
+            rainSystem.geometry.attributes.position.needsUpdate = true;
+
+            // ANIMATION HẠT CỔNG (Tối)
+            const pPos = particlesSystem.geometry.attributes.position.array;
+            const pVel = particlesSystem.userData.velocities;
+            for(let i=0; i < pVel.length; i++) {
+                pPos[i*3] += pVel[i].x;
+                pPos[i*3+1] += pVel[i].y;
+                pPos[i*3+2] += pVel[i].z;
+                const dist = Math.sqrt(pPos[i*3]**2 + pPos[i*3+2]**2);
+                if(dist > 2.5 || pPos[i*3+1] > 1.5) {
+                    pPos[i*3] = 0; pPos[i*3+1] = 0; pPos[i*3+2] = 0;
+                }
+            }
+            particlesSystem.geometry.attributes.position.needsUpdate = true;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    </script>
+</body>
+</html>
