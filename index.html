@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌌 Origin: Zero Void</title>
+    <title>🌆 Neon City - Rain Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
-        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 100; opacity: 0.5; }
+        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 100; opacity: 0.8; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; transition: opacity 1s; }
     </style>
 </head>
 <body>
+    <div id="loading"></div>
     <div id="joystick-zone"></div>
 
     <script type="importmap">
@@ -20,68 +22,129 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. VŨ TRỤ ---
+        // --- SETUP SCENE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020205); 
-        scene.fog = new THREE.Fog(0x020205, 30, 100);
+        scene.background = new THREE.Color(0x000205);
+        
+        // Thêm fog để mưa xa dần mờ, hòa vào skybox
+        scene.fog = new THREE.FogExp2(0x000205, 0.015);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 5); 
+        camera.position.set(0, 1.6, 3);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // Quan trọng: Cho phép renderer xóa buffer thủ công để vẽ lớp HUD
-        renderer.autoClear = false; 
         document.body.appendChild(renderer.domElement);
 
-        // Sàn vô hình
-        const floorBase = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
-        floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
-        scene.add(floorBase);
+        // --- MÔI TRƯỜNG 3D ---
+        const loader = new THREE.TextureLoader();
+        loader.load('neoncity0.webp', (texture) => {
+            const sky = new THREE.Mesh(
+                new THREE.SphereGeometry(100, 64, 32), 
+                new THREE.MeshBasicMaterial({ 
+                    map: texture, 
+                    side: THREE.BackSide,
+                    fog: false // Skybox không bị fog ảnh hưởng
+                })
+            );
+            scene.add(sky);
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
+        });
 
-        // --- 2. HỐ ĐEN & HẠT LƠ LỬNG (ĐÃ XÓA VÒNG XOAY) ---
-        let portalCore, pSystem; // Bỏ biến portalRing
-        function createEnergyPortal() {
-            // Lõi đen
-            portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-            portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
+        const floor = new THREE.Mesh(
+            new THREE.CircleGeometry(8, 32), 
+            new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+        );
+        floor.rotation.x = -Math.PI / 2; 
+        floor.position.y = -0.1; 
+        scene.add(floor);
+
+        const gridHelper = new THREE.PolarGridHelper(8, 8, 5, 32, 0x00f2ff, 0x00f2ff);
+        gridHelper.position.y = -0.09; 
+        gridHelper.material.opacity = 0.3; 
+        gridHelper.material.transparent = true; 
+        scene.add(gridHelper);
+
+        const rail = new THREE.Mesh(
+            new THREE.TorusGeometry(8, 0.2, 16, 100), 
+            new THREE.MeshBasicMaterial({ color: 0x00f2ff })
+        );
+        rail.rotation.x = Math.PI / 2; 
+        rail.position.y = 1.0; 
+        scene.add(rail);
+
+        // --- HỆ THỐNG MƯA 3D CẢI TIẾN ---
+        const rainGroup = new THREE.Group();
+        const rainCount = 3000;
+        const rainGeometry = new THREE.BufferGeometry();
+        const rainPositions = new Float32Array(rainCount * 3);
+        const rainVelocities = new Float32Array(rainCount); // Tốc độ rơi ngẫu nhiên
+        
+        // Tạo "vùng mưa" hình trụ bao quanh camera
+        const rainRadius = 40; // Bán kính vùng mưa (gần skybox radius=100)
+        const rainHeight = 60; // Chiều cao vùng mưa
+        
+        for(let i = 0; i < rainCount; i++) {
+            // Phân bố ngẫu nhiên trong hình trụ
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * rainRadius;
+            
+            rainPositions[i * 3] = Math.cos(angle) * radius;
+            rainPositions[i * 3 + 1] = (Math.random() - 0.5) * rainHeight;
+            rainPositions[i * 3 + 2] = Math.sin(angle) * radius;
+            
+            rainVelocities[i] = 10 + Math.random() * 5; // Tốc độ 10-15
+        }
+        
+        rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+        
+        // Material với alpha texture để tạo giọt mưa dài
+        const rainMaterial = new THREE.PointsMaterial({
+            color: 0xaaaaaa,
+            size: 0.15, // Kích thước nhỏ hơn để realistic
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false, // Tránh z-fighting
+            blending: THREE.AdditiveBlending // Hiệu ứng sáng nhẹ
+        });
+        
+        const rainSystem = new THREE.Points(rainGeometry, rainMaterial);
+        rainGroup.add(rainSystem);
+        scene.add(rainGroup);
+
+        // --- HỐ ĐEN & HẠT ĐỎ ---
+        let portalCore, pSystem;
+        function createVoidPortal() {
+            portalCore = new THREE.Mesh(
+                new THREE.CircleGeometry(1.5, 32), 
+                new THREE.MeshBasicMaterial({ color: 0x000000 })
+            );
+            portalCore.rotation.x = -Math.PI / 2; 
+            portalCore.position.y = -0.05; 
             scene.add(portalCore);
 
-            // --- ĐÃ XÓA ĐOẠN CODE TẠO VÒNG RING Ở ĐÂY ---
-
-            // HẠT TĨNH (Cụm mây hạt xanh)
             const particlesGeo = new THREE.BufferGeometry();
             const pCount = 300;
             const pArr = new Float32Array(pCount * 3);
-            for(let i=0; i<pCount*3; i++) {
+            for(let i = 0; i < pCount * 3; i++) {
                 pArr[i] = (Math.random() - 0.5) * 4; 
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
             
-            const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+            const pMat = new THREE.PointsMaterial({ 
+                color: 0xff0055, 
+                size: 0.08, 
+                transparent: true, 
+                opacity: 0.8 
+            });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = -0.2; 
+            pSystem.position.y = 0.2; 
             scene.add(pSystem);
         }
-        createEnergyPortal();
+        createVoidPortal();
 
-        // --- 3. BỤI VŨ TRỤ ---
-        const starsGeo = new THREE.BufferGeometry();
-        const starsCount = 4000;
-        const posArray = new Float32Array(starsCount * 3);
-        const velocityArray = [];
-        for(let i=0; i<starsCount; i++) {
-            posArray[i*3] = (Math.random() - 0.5) * 80;
-            posArray[i*3+1] = (Math.random() - 0.5) * 80;
-            posArray[i*3+2] = (Math.random() - 0.5) * 80;
-            velocityArray.push((Math.random() * 0.02) + 0.005);
-        }
-        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starsMat = new THREE.PointsMaterial({ size: 0.05, color: 0x88ccff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
-        const starField = new THREE.Points(starsGeo, starsMat);
-        scene.add(starField);
-
-        // --- 4. CLICK ĐỂ ĐI CITY ---
+        // --- CLICK ĐỂ VỀ INDEX ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -92,21 +155,40 @@
             raycaster.setFromCamera(mouse, camera);
             if (raycaster.intersectObject(portalCore).length > 0) {
                 document.body.style.transition = "transform 1s, opacity 1s";
-                document.body.style.transform = "scale(3)";
+                document.body.style.transform = "scale(0.1)"; 
                 document.body.style.opacity = "0";
-                setTimeout(() => { window.location.href = 'city.html'; }, 1000);
+                setTimeout(() => { window.location.href = 'index.html'; }, 1000);
             }
         }
         window.addEventListener('click', onTouch);
         window.addEventListener('touchstart', onTouch);
 
-        // --- 5. ANIMATION ---
+        // --- CONTROLS & ANIMATION ---
         let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
-        const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'white' });
+        const joy = nipplejs.create({ 
+            zone: document.getElementById('joystick-zone'), 
+            mode: 'static', 
+            position: {left: '60px', bottom: '60px'}, 
+            color: 'cyan' 
+        });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
         joy.on('end', () => { moveState = { f: 0, r: 0 }; });
-        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; }});
-        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; }});
+        
+        document.addEventListener('pointerdown', e => { 
+            if(e.clientX > 200) { 
+                interact = true; 
+                px = e.clientX; 
+                py = e.clientY; 
+                plon = look.lon; 
+                plat = look.lat; 
+            }
+        });
+        document.addEventListener('pointermove', e => { 
+            if (interact) { 
+                look.lon = (px - e.clientX) * 0.15 + plon; 
+                look.lat = (e.clientY - py) * 0.15 + plat; 
+            }
+        });
         document.addEventListener('pointerup', () => interact = false);
 
         const clock = new THREE.Clock();
@@ -114,36 +196,63 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // --- ĐÃ XÓA HOẠT ẢNH XOAY VÒNG RING ---
+            // --- ANIMATION MƯA (THEO CAMERA) ---
+            // Mưa luôn bao quanh camera (như thế giới thực)
+            rainGroup.position.x = camera.position.x;
+            rainGroup.position.z = camera.position.z;
+            
+            const positions = rainSystem.geometry.attributes.position.array;
+            for(let i = 0; i < rainCount; i++) {
+                const idx = i * 3;
+                
+                // Rơi xuống
+                positions[idx + 1] -= rainVelocities[i] * dt;
+                
+                // Reset khi chạm đất (y < -rainHeight/2)
+                if(positions[idx + 1] < -rainHeight / 2) {
+                    positions[idx + 1] = rainHeight / 2;
+                    
+                    // Randomize lại vị trí x,z để tự nhiên hơn
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * rainRadius;
+                    positions[idx] = Math.cos(angle) * radius;
+                    positions[idx + 2] = Math.sin(angle) * radius;
+                }
+            }
+            rainSystem.geometry.attributes.position.needsUpdate = true;
 
-            // Xoay nhẹ đám mây hạt
-            if(pSystem) pSystem.rotation.y += 0.005;
+            // Xoay nhẹ hạt đỏ
+            if(pSystem) pSystem.rotation.y += 0.005; 
 
-            // Camera
+            // --- CAMERA CONTROLS ---
             look.lat = Math.max(-85, Math.min(85, look.lat));
-            const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
-            camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
+            const phi = THREE.MathUtils.degToRad(90 - look.lat);
+            const theta = THREE.MathUtils.degToRad(look.lon);
+            camera.lookAt(
+                new THREE.Vector3()
+                    .setFromSphericalCoords(1, phi, theta)
+                    .add(camera.position)
+            );
+            
             if (moveState.f !== 0 || moveState.r !== 0) {
                 const speed = 8 * dt; 
-                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                const dir = new THREE.Vector3(); 
+                camera.getWorldDirection(dir); 
+                dir.y = 0; 
+                dir.normalize();
+                
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
-                if(nextPos.length() < 50) camera.position.copy(nextPos);
+                const nextPos = camera.position.clone()
+                    .addScaledVector(dir, moveState.f * speed)
+                    .addScaledVector(side, -moveState.r * speed);
+                    
+                if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
-            
-            // Bụi vũ trụ rơi
-            const pos = starField.geometry.attributes.position.array;
-            for(let i=0; i < starsCount; i++) {
-                pos[i*3 + 1] -= velocityArray[i]; 
-                if (pos[i*3 + 1] < -40) pos[i*3 + 1] = 40;
-            }
-            starField.geometry.attributes.position.needsUpdate = true;
 
-            // RENDER KÉP (Cho phép vẽ HUD nếu cần sau này)
-            renderer.clear();
             renderer.render(scene, camera);
         }
         animate();
+        
         window.addEventListener('resize', () => { 
             camera.aspect = window.innerWidth / window.innerHeight; 
             camera.updateProjectionMatrix(); 
