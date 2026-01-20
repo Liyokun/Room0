@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon City - Rain & Void</title>
+    <title>🌆 Neon City - Rain Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 100; opacity: 0.8; }
@@ -22,10 +22,12 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. SETUP ---
+        // --- SETUP SCENE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        scene.fog = null; // Tắt sương mù
+        
+        // Thêm fog để mưa xa dần mờ, hòa vào skybox
+        scene.fog = new THREE.FogExp2(0x000205, 0.015);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.6, 3);
@@ -34,77 +36,156 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. MÔI TRƯỜNG ---
+        // --- MÔI TRƯỜNG 3D ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
                 new THREE.SphereGeometry(100, 64, 32), 
-                new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+                new THREE.MeshBasicMaterial({ 
+                    map: texture, 
+                    side: THREE.BackSide,
+                    fog: false // Skybox không bị fog ảnh hưởng
+                })
             );
             scene.add(sky);
             document.getElementById('loading').style.opacity = '0';
             setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
         });
 
-        const floor = new THREE.Mesh(new THREE.CircleGeometry(8, 32), new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
-        floor.rotation.x = -Math.PI / 2; floor.position.y = -0.1; scene.add(floor);
+        const floor = new THREE.Mesh(
+            new THREE.CircleGeometry(8, 32), 
+            new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+        );
+        floor.rotation.x = -Math.PI / 2; 
+        floor.position.y = -0.1; 
+        scene.add(floor);
+
         const gridHelper = new THREE.PolarGridHelper(8, 8, 5, 32, 0x00f2ff, 0x00f2ff);
-        gridHelper.position.y = -0.09; gridHelper.material.opacity = 0.3; gridHelper.material.transparent = true; scene.add(gridHelper);
-        const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
-        rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
+        gridHelper.position.y = -0.09; 
+        gridHelper.material.opacity = 0.3; 
+        gridHelper.material.transparent = true; 
+        scene.add(gridHelper);
 
-        // --- 3. MƯA XA (ĐÃ CHỈNH SỬA: KHÔNG DÙNG CODE THAM KHẢO VÌ NÓ RƠI TRONG NHÀ) ---
-        // Dùng lại mưa Vòm (Dome) để mưa rơi ngoài ban công
-        const rainCount = 4000;
-        const rainGeo = new THREE.BufferGeometry();
-        const rainPos = new Float32Array(rainCount * 3);
-        const rainVel = [];
+        const rail = new THREE.Mesh(
+            new THREE.TorusGeometry(8, 0.2, 16, 100), 
+            new THREE.MeshBasicMaterial({ color: 0x00f2ff })
+        );
+        rail.rotation.x = Math.PI / 2; 
+        rail.position.y = 1.0; 
+        scene.add(rail);
 
-        for(let i=0; i<rainCount; i++) {
-            // Rải mưa ở bán kính 90m (sát ảnh nền)
-            const r = 90 + Math.random() * 5; 
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-
-            rainPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-            rainPos[i*3+1] = Math.random() * 100 - 50; 
-            rainPos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+        // --- HỆ THỐNG MƯA 3D CẢI TIẾN ---
+        const rainGroup = new THREE.Group();
+        const rainCount = 3000;
+        const rainGeometry = new THREE.BufferGeometry();
+        const rainPositions = new Float32Array(rainCount * 3);
+        const rainVelocities = new Float32Array(rainCount); // Tốc độ rơi ngẫu nhiên
+        
+        // Tạo "vùng mưa" hình trụ bao quanh camera
+        const rainRadius = 40; // Bán kính vùng mưa (gần skybox radius=100)
+        const rainHeight = 60; // Chiều cao vùng mưa
+        
+        for(let i = 0; i < rainCount; i++) {
+            // Phân bố ngẫu nhiên trong hình trụ
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * rainRadius;
             
-            rainVel.push(0.5 + Math.random() * 0.5);
+            rainPositions[i * 3] = Math.cos(angle) * radius;
+            rainPositions[i * 3 + 1] = (Math.random() - 0.5) * rainHeight;
+            rainPositions[i * 3 + 2] = Math.sin(angle) * radius;
+            
+            rainVelocities[i] = 10 + Math.random() * 5; // Tốc độ 10-15
         }
-        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-        const rainMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.5, transparent: true, opacity: 0.4 });
-        const rainSystem = new THREE.Points(rainGeo, rainMat);
-        scene.add(rainSystem);
+        
+        rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+        
+        // Material với alpha texture để tạo giọt mưa dài
+        const rainMaterial = new THREE.PointsMaterial({
+            color: 0xaaaaaa,
+            size: 0.15, // Kích thước nhỏ hơn để realistic
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false, // Tránh z-fighting
+            blending: THREE.AdditiveBlending // Hiệu ứng sáng nhẹ
+        });
+        
+        const rainSystem = new THREE.Points(rainGeometry, rainMaterial);
+        rainGroup.add(rainSystem);
+        scene.add(rainGroup);
 
-        // --- 4. HỐ ĐEN (CẤU TRÚC CHUẨN - KHÔNG VÒNG) ---
-        let portalCore, pSystem;
+        // --- HỐ ĐEN MA THUẬT XOÁY ỐC ---
+        let portalCore, pSystem, spiralRings = [];
         function createVoidPortal() {
-            // Lõi đen
-            portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-            portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; 
+            // 1. LÕI ĐEN TRUNG TÂM
+            portalCore = new THREE.Mesh(
+                new THREE.CircleGeometry(1.5, 32), 
+                new THREE.MeshBasicMaterial({ color: 0x000000 })
+            );
+            portalCore.rotation.x = -Math.PI / 2; 
+            portalCore.position.y = -0.05; 
             scene.add(portalCore);
 
-            // *** KHÔNG CÓ VÒNG RING ***
+            // 2. VÒNG XOÁY ỐC MA THUẬT (3 lớp)
+            const ringLayers = [
+                { radius: 2.0, color: 0xff0055, opacity: 0.8, speed: 1.0 },
+                { radius: 2.5, color: 0xff0088, opacity: 0.6, speed: -0.8 },
+                { radius: 3.0, color: 0xff00bb, opacity: 0.4, speed: 1.2 }
+            ];
 
-            // HẠT NĂNG LƯỢNG (Copy y chang logic file tham khảo)
+            ringLayers.forEach(layer => {
+                const ring = new THREE.Mesh(
+                    new THREE.RingGeometry(layer.radius - 0.15, layer.radius + 0.15, 64),
+                    new THREE.MeshBasicMaterial({
+                        color: layer.color,
+                        transparent: true,
+                        opacity: layer.opacity,
+                        side: THREE.DoubleSide,
+                        blending: THREE.AdditiveBlending
+                    })
+                );
+                ring.rotation.x = -Math.PI / 2;
+                ring.position.y = 0.01;
+                ring.userData.speed = layer.speed; // Lưu tốc độ xoay
+                scene.add(ring);
+                spiralRings.push(ring);
+            });
+
+            // 3. HẠT XOÁY SPIRALING (Hiệu ứng hút vào trong)
             const particlesGeo = new THREE.BufferGeometry();
-            const pCount = 300;
+            const pCount = 500;
             const pArr = new Float32Array(pCount * 3);
-            for(let i=0; i<pCount*3; i++) {
-                pArr[i] = (Math.random() - 0.5) * 4; 
+            const pAngles = new Float32Array(pCount); // Lưu góc xoay
+            const pRadii = new Float32Array(pCount);  // Lưu bán kính
+            
+            for(let i = 0; i < pCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 1.5 + Math.random() * 2.5; // Từ 1.5 đến 4
+                
+                pArr[i * 3] = Math.cos(angle) * radius;
+                pArr[i * 3 + 1] = (Math.random() - 0.5) * 0.5; // Y ngẫu nhiên
+                pArr[i * 3 + 2] = Math.sin(angle) * radius;
+                
+                pAngles[i] = angle;
+                pRadii[i] = radius;
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
+            particlesGeo.setAttribute('angle', new THREE.BufferAttribute(pAngles, 1));
+            particlesGeo.setAttribute('radius', new THREE.BufferAttribute(pRadii, 1));
             
-            // Màu Hồng Đỏ
-            const pMat = new THREE.PointsMaterial({ color: 0xff0055, size: 0.08, transparent: true, opacity: 0.8 });
+            const pMat = new THREE.PointsMaterial({ 
+                color: 0xff0055, 
+                size: 0.1, 
+                transparent: true, 
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
             pSystem = new THREE.Points(particlesGeo, pMat);
             pSystem.position.y = 0.2; 
             scene.add(pSystem);
         }
         createVoidPortal();
 
-        // --- 5. CLICK ---
+        // --- CLICK ĐỂ VỀ INDEX ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -123,13 +204,32 @@
         window.addEventListener('click', onTouch);
         window.addEventListener('touchstart', onTouch);
 
-        // --- 6. ANIMATION ---
+        // --- CONTROLS & ANIMATION ---
         let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
-        const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
+        const joy = nipplejs.create({ 
+            zone: document.getElementById('joystick-zone'), 
+            mode: 'static', 
+            position: {left: '60px', bottom: '60px'}, 
+            color: 'cyan' 
+        });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
         joy.on('end', () => { moveState = { f: 0, r: 0 }; });
-        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; }});
-        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; }});
+        
+        document.addEventListener('pointerdown', e => { 
+            if(e.clientX > 200) { 
+                interact = true; 
+                px = e.clientX; 
+                py = e.clientY; 
+                plon = look.lon; 
+                plat = look.lat; 
+            }
+        });
+        document.addEventListener('pointermove', e => { 
+            if (interact) { 
+                look.lon = (px - e.clientX) * 0.15 + plon; 
+                look.lat = (e.clientY - py) * 0.15 + plat; 
+            }
+        });
         document.addEventListener('pointerup', () => interact = false);
 
         const clock = new THREE.Clock();
@@ -137,31 +237,103 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // Xoay nhẹ đám mây hạt
-            if(pSystem) pSystem.rotation.y += 0.005;
-
-            // Mưa xa rơi
-            const rPos = rainSystem.geometry.attributes.position.array;
-            for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= 0.5; 
-                if(rPos[i*3+1] < -50) rPos[i*3+1] = 50;
+            // --- ANIMATION MƯA (THEO CAMERA) ---
+            // Mưa luôn bao quanh camera (như thế giới thực)
+            rainGroup.position.x = camera.position.x;
+            rainGroup.position.z = camera.position.z;
+            
+            const positions = rainSystem.geometry.attributes.position.array;
+            for(let i = 0; i < rainCount; i++) {
+                const idx = i * 3;
+                
+                // Rơi xuống
+                positions[idx + 1] -= rainVelocities[i] * dt;
+                
+                // Reset khi chạm đất (y < -rainHeight/2)
+                if(positions[idx + 1] < -rainHeight / 2) {
+                    positions[idx + 1] = rainHeight / 2;
+                    
+                    // Randomize lại vị trí x,z để tự nhiên hơn
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * rainRadius;
+                    positions[idx] = Math.cos(angle) * radius;
+                    positions[idx + 2] = Math.sin(angle) * radius;
+                }
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
 
+            // --- ANIMATION CỔNG HỐ ĐEN MA THUẬT ---
+            // 1. Xoay các vòng spiraling (mỗi vòng tốc độ khác nhau)
+            spiralRings.forEach(ring => {
+                ring.rotation.z += ring.userData.speed * dt;
+            });
+
+            // 2. Hạt xoáy vào tâm + nhấp nháy
+            if(pSystem) {
+                const positions = pSystem.geometry.attributes.position.array;
+                const angles = pSystem.geometry.attributes.angle.array;
+                const radii = pSystem.geometry.attributes.radius.array;
+                
+                for(let i = 0; i < positions.length / 3; i++) {
+                    const idx = i * 3;
+                    
+                    // Xoay quanh tâm
+                    angles[i] += 2 * dt; // Tốc độ xoay
+                    
+                    // Thu nhỏ dần vào tâm
+                    radii[i] -= 0.5 * dt;
+                    if(radii[i] < 0.5) radii[i] = 4.0; // Reset về ngoài
+                    
+                    // Cập nhật vị trí
+                    positions[idx] = Math.cos(angles[i]) * radii[i];
+                    positions[idx + 2] = Math.sin(angles[i]) * radii[i];
+                    
+                    // Hiệu ứng sóng Y (lên xuống nhẹ)
+                    positions[idx + 1] = Math.sin(angles[i] * 3) * 0.2;
+                }
+                
+                pSystem.geometry.attributes.position.needsUpdate = true;
+                pSystem.geometry.attributes.angle.needsUpdate = true;
+                pSystem.geometry.attributes.radius.needsUpdate = true;
+                
+                // Nhấp nháy nhẹ opacity
+                pSystem.material.opacity = 0.7 + Math.sin(Date.now() * 0.003) * 0.2;
+            } 
+
+            // --- CAMERA CONTROLS ---
             look.lat = Math.max(-85, Math.min(85, look.lat));
-            const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
-            camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
+            const phi = THREE.MathUtils.degToRad(90 - look.lat);
+            const theta = THREE.MathUtils.degToRad(look.lon);
+            camera.lookAt(
+                new THREE.Vector3()
+                    .setFromSphericalCoords(1, phi, theta)
+                    .add(camera.position)
+            );
+            
             if (moveState.f !== 0 || moveState.r !== 0) {
                 const speed = 8 * dt; 
-                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                const dir = new THREE.Vector3(); 
+                camera.getWorldDirection(dir); 
+                dir.y = 0; 
+                dir.normalize();
+                
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
+                const nextPos = camera.position.clone()
+                    .addScaledVector(dir, moveState.f * speed)
+                    .addScaledVector(side, -moveState.r * speed);
+                    
                 if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
+
             renderer.render(scene, camera);
         }
         animate();
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        
+        window.addEventListener('resize', () => { 
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+        });
     </script>
 </body>
 </html>
