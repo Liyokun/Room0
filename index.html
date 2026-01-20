@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon City FPS Explorer</title>
+    <title>🌆 Neon City FPS Explorer - Clear Vibes</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone {
@@ -25,7 +25,7 @@
     <div id="loading">
         <div class="spinner"></div>
         <p>🌆 ĐANG KHỞI ĐỘNG NEON CITY...</p>
-        <p>Đang load khung cảnh xung quanh...</p>
+        <p>Đang load khung cảnh rõ nét...</p>
     </div>
 
     <div id="joystick-zone"></div>
@@ -44,10 +44,11 @@
 
         // --- KHỞI TẠO ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000205);
-        scene.fog = new THREE.Fog(0x000205, 20, 800); // Sương mù xa hơn để mở rộng không gian
+        scene.background = new THREE.Color(0x000000); // Nền đen sạch
+        // BỎ FOG HOÀN TOÀN ĐỂ RÕ NÉT (nếu muốn fog nhẹ sau này thì thêm lại)
+        // scene.fog = null;
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000);
         camera.position.set(0, 1.6, 5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -55,25 +56,24 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- LOAD KHUNG CẢNH 360° (neoncity0.webp cùng thư mục) ---
+        // --- LOAD KHUNG CẢNH 360° LỚN HƠN, RÕ HƠN ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
-                new THREE.SphereGeometry(800, 60, 40), // Quả cầu lớn bao quanh
+                new THREE.SphereGeometry(1500, 60, 40), // LỚN HƠN ĐỂ BAO RỘNG
                 new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
             );
             scene.add(sky);
 
-            // Ẩn loading khi load xong
+            // Ẩn loading
             document.getElementById('loading').style.opacity = '0';
             setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
         }, undefined, (err) => {
-            console.error('Lỗi load ảnh:', err);
-            document.querySelector('#loading p:last-child').textContent = 'Lỗi load ảnh (kiểm tra file neoncity0.webp)';
+            console.error('Lỗi load:', err);
         });
 
-        // --- SÀN NHẸ + ĐÁY ĐEN (không tường nữa để thấy khung cảnh xung quanh) ---
-        const floorSize = 400; // Rộng lớn hơn
+        // --- SÀN RỘNG NHƯNG DỄ ĐỊNH HƯỚNG ---
+        const floorSize = 600; // Vẫn rộng để khám phá
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(floorSize, floorSize),
             new THREE.MeshBasicMaterial({ color: 0x010103 })
@@ -82,35 +82,30 @@
         floor.position.y = -0.01;
         scene.add(floor);
 
-        const grid = new THREE.GridHelper(floorSize, 50, 0x00f2ff, 0x00f2ff);
-        grid.material.opacity = 0.2;
+        const grid = new THREE.GridHelper(floorSize, 60, 0x00f2ff, 0x00f2ff); // Nhiều ô hơn để thấy rõ
+        grid.material.opacity = 0.3;
         grid.material.transparent = true;
         scene.add(grid);
 
-        // --- BỤI SAO + TRỤ NEON (giữ nguyên để sinh động) ---
+        // --- BỤI SAO + TRỤ (giữ để vui mắt) ---
         const starsGeo = new THREE.BufferGeometry();
-        const starsCount = 2000;
+        const starsCount = 3000;
         const posArray = new Float32Array(starsCount * 3);
-        for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 400;
+        for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 600;
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.05, color: 0xffffff, transparent: true, opacity: 0.6 }));
+        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.05, color: 0xffffff, transparent: true, opacity: 0.7 }));
         scene.add(starField);
 
         function addPillar(x, z, color, h) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), new THREE.MeshBasicMaterial({ color, wireframe: true }));
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 1.2), new THREE.MeshBasicMaterial({ color, wireframe: true }));
             mesh.position.set(x, h/2, z);
             scene.add(mesh);
-
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.05, 16, 100), new THREE.MeshBasicMaterial({ color }));
-            ring.rotation.x = Math.PI/2;
-            ring.position.set(x, 0.05, z);
-            scene.add(ring);
         }
-        addPillar(-20, -20, 0x00f2ff, 12);
-        addPillar(20, -20, 0xff0055, 10);
-        addPillar(0, -40, 0xffff00, 15);
+        addPillar(-30, -30, 0x00f2ff, 15);
+        addPillar(30, -30, 0xff0055, 12);
+        addPillar(0, -60, 0xffff00, 20);
 
-        // --- ĐIỀU KHIỂN (giữ nguyên siêu mượt) ---
+        // --- ĐIỀU KHIỂN ---
         let moveState = { f: 0, r: 0 };
         let look = { lat: 0, lon: -90 };
         let interact = false;
@@ -137,19 +132,19 @@
             camera.lookAt(target);
 
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 15 * dt; // Nhanh hơn tí cho không gian rộng
+                const speed = 20 * dt; // Nhanh hơn cho không gian rộng
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
                 camera.position.addScaledVector(dir, moveState.f * speed);
                 camera.position.addScaledVector(side, -moveState.r * speed);
             }
 
-            // Giới hạn rộng lớn (có thể bỏ luôn nếu muốn vô tận)
-            const lim = 180;
+            // Giới hạn rộng rãi hơn
+            const lim = 300;
             camera.position.x = Math.max(-lim, Math.min(lim, camera.position.x));
             camera.position.z = Math.max(-lim, Math.min(lim, camera.position.z));
 
-            starField.rotation.y += 0.0002;
+            starField.rotation.y += 0.0003;
 
             renderer.render(scene, camera);
         }
