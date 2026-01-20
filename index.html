@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon City - Proportions Optimized</title>
+    <title>🌆 Neon Penthouse - Final</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone {
@@ -24,8 +24,8 @@
 <body>
     <div id="loading">
         <div class="spinner"></div>
-        <p>🌆 ĐANG TỐI ƯU KHÔNG GIAN...</p>
-        <p>Vui lòng đợi trong giây lát...</p>
+        <p>🌆 ĐANG XÂY DỰNG BAN CÔNG...</p>
+        <p>Vui lòng đợi...</p>
     </div>
 
     <div id="joystick-zone"></div>
@@ -45,69 +45,79 @@
         // --- 1. KHỞI TẠO ENGINE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        // Điều chỉnh sương mù để phù hợp với tỉ lệ mới
         scene.fog = new THREE.Fog(0x000205, 10, 250); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        // Tầm mắt người tiêu chuẩn
-        camera.position.set(0, 1.6, 5);
+        camera.position.set(0, 1.6, 5); // Đứng ở giữa ban công
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. LOAD KHUNG CẢNH 360° (TỐI ƯU ĐỘ NÉT) ---
+        // --- 2. LOAD ẢNH 360 (SẮC NÉT) ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
-                // Thu nhỏ bán kính xuống 150 để ảnh sắc nét và gần mắt hơn
-                new THREE.SphereGeometry(150, 64, 32), 
+                // Bán kính 120: Đủ gần để nét, đủ xa để thoáng
+                new THREE.SphereGeometry(120, 64, 32), 
                 new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
             );
             scene.add(sky);
 
+            // Ẩn loading
             document.getElementById('loading').style.opacity = '0';
             setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
         });
 
-        // --- 3. SÀN NHỎ GỌN (KHÔNG CHE TẦM NHÌN) ---
-        const floorSize = 80; // Thu nhỏ sàn để nhìn thấy chân trời thành phố
+        // --- 3. BAN CÔNG PENTHOUSE (THAY CHO SÀN VUÔNG ĐEN) ---
+        
+        // A. Sàn kính tròn (Circle)
+        const balconyRadius = 40; 
         const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(floorSize, floorSize),
-            // Thêm độ trong suốt nhẹ để sàn trông công nghệ hơn
-            new THREE.MeshBasicMaterial({ color: 0x010103, transparent: true, opacity: 0.7 })
+            new THREE.CircleGeometry(balconyRadius, 64),
+            new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
         );
         floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.5; // Hạ thấp sàn xuống dưới tầm mắt một chút
+        floor.position.y = -0.1; 
         scene.add(floor);
 
-        const grid = new THREE.GridHelper(floorSize, 40, 0x00f2ff, 0x00f2ff);
-        grid.material.opacity = 0.2;
-        grid.material.transparent = true;
-        grid.position.y = -0.49; // Đặt lưới ngay trên mặt sàn
-        scene.add(grid);
+        // B. Lưới trang trí trên sàn
+        const gridHelper = new THREE.PolarGridHelper(balconyRadius, 16, 8, 64, 0x00f2ff, 0x00f2ff);
+        gridHelper.position.y = -0.09;
+        gridHelper.material.opacity = 0.3;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
 
-        // --- 4. BỤI SAO + TRỤ NEON ---
+        // C. Lan can phát sáng (Railing) - Điểm nhấn quan trọng!
+        const railGeo = new THREE.TorusGeometry(balconyRadius, 0.5, 16, 100);
+        const railMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
+        const railing = new THREE.Mesh(railGeo, railMat);
+        railing.rotation.x = Math.PI / 2;
+        railing.position.y = 1.0; // Cao ngang bụng
+        scene.add(railing);
+
+        // --- 4. CỘT DỮ LIỆU & BỤI SAO ---
         const starsGeo = new THREE.BufferGeometry();
-        const starsCount = 1500;
+        const starsCount = 1000;
         const posArray = new Float32Array(starsCount * 3);
         for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 200;
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, transparent: true, opacity: 0.6 }));
+        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, transparent: true, opacity: 0.5 }));
         scene.add(starField);
 
         function addPillar(x, z, color, h) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, h, 0.8), new THREE.MeshBasicMaterial({ color, wireframe: true }));
-            mesh.position.set(x, h/2 - 0.5, z);
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), new THREE.MeshBasicMaterial({ color, wireframe: true }));
+            mesh.position.set(x, h/2 - 0.1, z);
             scene.add(mesh);
-
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.04, 16, 100), new THREE.MeshBasicMaterial({ color }));
+            // Vòng sáng dưới chân cột
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.05, 16, 100), new THREE.MeshBasicMaterial({ color }));
             ring.rotation.x = Math.PI/2;
-            ring.position.set(x, -0.4, z);
+            ring.position.set(x, 0, z);
             scene.add(ring);
         }
-        // Đặt các trụ gần hơn để dễ quan sát
+        
+        // Đặt cột nằm gọn trong ban công
         addPillar(-10, -10, 0x00f2ff, 8); // Skincare
         addPillar(10, -10, 0xff0055, 6);  // Health
         addPillar(0, -20, 0xffff00, 10); // Total
@@ -126,7 +136,7 @@
         document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; }});
         document.addEventListener('pointerup', () => interact = false);
 
-        // --- 6. VÒNG LẶP ANIMATION ---
+        // --- 6. ANIMATION ---
         const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
@@ -139,17 +149,20 @@
             camera.lookAt(target);
 
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 12 * dt; 
+                const speed = 10 * dt; 
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                camera.position.addScaledVector(dir, moveState.f * speed);
-                camera.position.addScaledVector(side, -moveState.r * speed);
-            }
+                
+                // Tính toán vị trí dự kiến
+                const nextPos = camera.position.clone();
+                nextPos.addScaledVector(dir, moveState.f * speed);
+                nextPos.addScaledVector(side, -moveState.r * speed);
 
-            // Giới hạn vùng di chuyển trong phạm vi sàn
-            const lim = (floorSize / 2) - 2;
-            camera.position.x = Math.max(-lim, Math.min(lim, camera.position.x));
-            camera.position.z = Math.max(-lim, Math.min(lim, camera.position.z));
+                // Giới hạn hình tròn (Bán kính ban công - 2m an toàn)
+                if (nextPos.length() < balconyRadius - 2) {
+                    camera.position.copy(nextPos);
+                }
+            }
 
             starField.rotation.y += 0.0002;
             renderer.render(scene, camera);
