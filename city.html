@@ -25,7 +25,7 @@
         // --- 1. SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        scene.fog = null;
+        scene.fog = null; // Tắt sương mù
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.6, 3);
@@ -53,18 +53,23 @@
         const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
         rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- 3. MƯA XA (DISTANT RAIN) ---
-        const rainCount = 3000;
+        // --- 3. MƯA XA (ĐÃ CHỈNH SỬA: KHÔNG DÙNG CODE THAM KHẢO VÌ NÓ RƠI TRONG NHÀ) ---
+        // Dùng lại mưa Vòm (Dome) để mưa rơi ngoài ban công
+        const rainCount = 4000;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
         const rainVel = [];
+
         for(let i=0; i<rainCount; i++) {
+            // Rải mưa ở bán kính 90m (sát ảnh nền)
             const r = 90 + Math.random() * 5; 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
+
             rainPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-            rainPos[i*3+1] = Math.random() * 100 - 50;
+            rainPos[i*3+1] = Math.random() * 100 - 50; 
             rainPos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+            
             rainVel.push(0.5 + Math.random() * 0.5);
         }
         rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
@@ -72,7 +77,7 @@
         const rainSystem = new THREE.Points(rainGeo, rainMat);
         scene.add(rainSystem);
 
-        // --- 4. HỐ ĐEN (NGUYÊN LÝ THAM KHẢO - MÀU ĐỎ/HỒNG) ---
+        // --- 4. HỐ ĐEN (CẤU TRÚC CHUẨN - KHÔNG VÒNG) ---
         let portalCore, pSystem;
         function createVoidPortal() {
             // Lõi đen
@@ -80,7 +85,9 @@
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; 
             scene.add(portalCore);
 
-            // Cấu trúc hạt lơ lửng xoay theo file tham khảo
+            // *** KHÔNG CÓ VÒNG RING ***
+
+            // HẠT NĂNG LƯỢNG (Copy y chang logic file tham khảo)
             const particlesGeo = new THREE.BufferGeometry();
             const pCount = 300;
             const pArr = new Float32Array(pCount * 3);
@@ -130,13 +137,13 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // Hiệu ứng hạt lơ lửng xoay nhẹ
+            // Xoay nhẹ đám mây hạt
             if(pSystem) pSystem.rotation.y += 0.005;
 
-            // Mưa xa
+            // Mưa xa rơi
             const rPos = rainSystem.geometry.attributes.position.array;
             for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= 0.5;
+                rPos[i*3+1] -= 0.5; 
                 if(rPos[i*3+1] < -50) rPos[i*3+1] = 50;
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
