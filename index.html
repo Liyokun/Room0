@@ -1,159 +1,42 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon City FPS 360</title>
-<style>
-body { margin:0; overflow:hidden; background:black; touch-action:none; }
-#joystick-zone {
-    position:absolute; bottom:50px; left:50px;
-    width:120px; height:120px; z-index:100;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon City Test</title>
+    <style>body { margin:0; overflow:hidden; background:#000; }</style>
 </head>
 <body>
-
-<div id="joystick-zone"></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://yoannimmo.github.io/nipplejs/dist/nipplejs.js"></script>
-
 <script>
-/* ================== SETUP ================== */
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 1.6, 5);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-const scene = new THREE.Scene();
+    const loader = new THREE.TextureLoader();
+    loader.load('neoncity0.webp', texture => {
+        const sky = new THREE.Mesh(
+            new THREE.SphereGeometry(500, 32, 16),
+            new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+        );
+        scene.add(sky);
+        alert('Ảnh neon city đã load! Xoay chuột để nhìn quanh.');
+    }, undefined, err => alert('Lỗi load ảnh: ' + err.message));
 
-/* ❌ TẮT FOG + BACKGROUND (rất quan trọng) */
-// scene.background = new THREE.Color(0x000205);
-// scene.fog = new THREE.Fog(0x000205, 1, 50);
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    animate();
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 3000);
-
-/* 🔴 CAMERA PHẢI Ở TÂM QUẢ CẦU */
-camera.position.set(0, 1.6, 0);
-
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
-
-/* ================== LOAD ẢNH 360 ================== */
-
-const loader = new THREE.TextureLoader();
-loader.setCrossOrigin('anonymous');
-
-loader.load(
-  'https://liyokun.github.io/Room0/neoncity0.webp',
-
-  function(texture){
-
-    console.log("✅ ẢNH 360 LOAD OK");
-
-    const skyGeo = new THREE.SphereGeometry(1200, 64, 64);
-    const skyMat = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.BackSide
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
-
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-
-    /* 🔴 XOAY 180° ĐỂ ĐÚNG HƯỚNG ẢNH */
-    sky.rotation.y = Math.PI;
-
-    scene.add(sky);
-  },
-
-  undefined,
-
-  function(err){
-    console.error("❌ LỖI LOAD ẢNH:", err);
-  }
-);
-
-/* ================== HIỆU ỨNG BỤI SAO (GIỮ TỪ FILE TỐT) ================== */
-
-const starsGeo = new THREE.BufferGeometry();
-const starsCount = 1000;
-const posArray = new Float32Array(starsCount * 3);
-for(let i=0;i<starsCount*3;i++) posArray[i] = (Math.random()-0.5)*200;
-starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray,3));
-const starField = new THREE.Points(
-    starsGeo,
-    new THREE.PointsMaterial({ size:0.05, color:0xffffff, transparent:true, opacity:0.5 })
-);
-scene.add(starField);
-
-/* ================== ĐIỀU KHIỂN FPS + JOYSTICK (GIỮ NGUYÊN PHONG CÁCH BẠN) ================== */
-
-let moveState = { f:0, r:0 };
-let look = { lat:0, lon:-90 };
-let interact = false;
-let px, py, plon, plat;
-
-const joy = nipplejs.create({
-  zone: document.getElementById('joystick-zone'),
-  mode:'static',
-  position:{ left:'60px', bottom:'60px' },
-  color:'cyan'
-});
-
-joy.on('move', (e,d)=>{ moveState.f = d.vector.y; moveState.r = d.vector.x; });
-joy.on('end', ()=> moveState = { f:0, r:0 });
-
-document.addEventListener('pointerdown', e=>{
-  if(e.clientX > 200){
-    interact = true;
-    px=e.clientX; py=e.clientY;
-    plon=look.lon; plat=look.lat;
-  }
-});
-document.addEventListener('pointermove', e=>{
-  if(interact){
-    look.lon = (px - e.clientX)*0.15 + plon;
-    look.lat = (e.clientY - py)*0.15 + plat;
-  }
-});
-document.addEventListener('pointerup', ()=> interact=false);
-
-/* ================== LOOP ================== */
-
-const clock = new THREE.Clock();
-
-function animate(){
-  requestAnimationFrame(animate);
-  const dt = clock.getDelta();
-
-  look.lat = Math.max(-85, Math.min(85, look.lat));
-  const phi = THREE.MathUtils.degToRad(90 - look.lat);
-  const theta = THREE.MathUtils.degToRad(look.lon);
-  const target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
-  camera.lookAt(target);
-
-  if(moveState.f || moveState.r){
-    const speed = 10 * dt;
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    dir.y = 0; dir.normalize();
-
-    const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-
-    camera.position.addScaledVector(dir, moveState.f * speed);
-    camera.position.addScaledVector(side, -moveState.r * speed);
-  }
-
-  starField.rotation.y += 0.0003;
-
-  renderer.render(scene, camera);
-}
-
-animate();
-
-window.addEventListener('resize', ()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
 </script>
 </body>
 </html>
