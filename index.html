@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon Penthouse - Final</title>
+    <title>🌆 Neon Room - Cozy Size</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone {
@@ -24,7 +24,7 @@
 <body>
     <div id="loading">
         <div class="spinner"></div>
-        <p>🌆 ĐANG XÂY DỰNG BAN CÔNG...</p>
+        <p>🌆 ĐANG THIẾT LẬP CĂN PHÒNG...</p>
         <p>Vui lòng đợi...</p>
     </div>
 
@@ -45,10 +45,11 @@
         // --- 1. KHỞI TẠO ENGINE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        scene.fog = new THREE.Fog(0x000205, 10, 250); 
+        // Sương mù gần hơn vì phòng nhỏ
+        scene.fog = new THREE.Fog(0x000205, 5, 150); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 5); // Đứng ở giữa ban công
+        camera.position.set(0, 1.6, 3); // Đứng gần tâm phòng hơn
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -59,23 +60,24 @@
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
-                // Bán kính 120: Đủ gần để nét, đủ xa để thoáng
-                new THREE.SphereGeometry(120, 64, 32), 
+                // Bán kính 100 là đủ nét cho phòng nhỏ
+                new THREE.SphereGeometry(100, 64, 32), 
                 new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
             );
             scene.add(sky);
 
-            // Ẩn loading
             document.getElementById('loading').style.opacity = '0';
             setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
         });
 
-        // --- 3. BAN CÔNG PENTHOUSE (THAY CHO SÀN VUÔNG ĐEN) ---
+        // --- 3. CĂN PHÒNG PENTHOUSE NHỎ GỌN ---
         
-        // A. Sàn kính tròn (Circle)
-        const balconyRadius = 40; 
+        // *** THAY ĐỔI QUAN TRỌNG: GIẢM BÁN KÍNH ***
+        const balconyRadius = 8; // Giảm từ 40 xuống 8 (Đường kính 16m)
+
+        // A. Sàn kính tròn
         const floor = new THREE.Mesh(
-            new THREE.CircleGeometry(balconyRadius, 64),
+            new THREE.CircleGeometry(balconyRadius, 32),
             new THREE.MeshBasicMaterial({ color: 0x050510, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
         );
         floor.rotation.x = -Math.PI / 2;
@@ -83,23 +85,24 @@
         scene.add(floor);
 
         // B. Lưới trang trí trên sàn
-        const gridHelper = new THREE.PolarGridHelper(balconyRadius, 16, 8, 64, 0x00f2ff, 0x00f2ff);
+        const gridHelper = new THREE.PolarGridHelper(balconyRadius, 8, 5, 32, 0x00f2ff, 0x00f2ff);
         gridHelper.position.y = -0.09;
         gridHelper.material.opacity = 0.3;
         gridHelper.material.transparent = true;
         scene.add(gridHelper);
 
-        // C. Lan can phát sáng (Railing) - Điểm nhấn quan trọng!
-        const railGeo = new THREE.TorusGeometry(balconyRadius, 0.5, 16, 100);
+        // C. Lan can phát sáng (Làm mỏng lại cho tinh tế)
+        // Tham số thứ 2 giảm từ 0.5 xuống 0.2
+        const railGeo = new THREE.TorusGeometry(balconyRadius, 0.2, 16, 100);
         const railMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
         const railing = new THREE.Mesh(railGeo, railMat);
         railing.rotation.x = Math.PI / 2;
-        railing.position.y = 1.0; // Cao ngang bụng
+        railing.position.y = 1.0; 
         scene.add(railing);
 
         // --- 4. CỘT DỮ LIỆU & BỤI SAO ---
         const starsGeo = new THREE.BufferGeometry();
-        const starsCount = 1000;
+        const starsCount = 800; // Giảm bớt sao vì góc nhìn hẹp hơn
         const posArray = new Float32Array(starsCount * 3);
         for(let i = 0; i < starsCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 200;
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
@@ -107,20 +110,20 @@
         scene.add(starField);
 
         function addPillar(x, z, color, h) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1), new THREE.MeshBasicMaterial({ color, wireframe: true }));
+            // Làm cột nhỏ lại một chút cho cân xứng với phòng
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, h, 0.6), new THREE.MeshBasicMaterial({ color, wireframe: true }));
             mesh.position.set(x, h/2 - 0.1, z);
             scene.add(mesh);
-            // Vòng sáng dưới chân cột
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.05, 16, 100), new THREE.MeshBasicMaterial({ color }));
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 16, 50), new THREE.MeshBasicMaterial({ color }));
             ring.rotation.x = Math.PI/2;
             ring.position.set(x, 0, z);
             scene.add(ring);
         }
         
-        // Đặt cột nằm gọn trong ban công
-        addPillar(-10, -10, 0x00f2ff, 8); // Skincare
-        addPillar(10, -10, 0xff0055, 6);  // Health
-        addPillar(0, -20, 0xffff00, 10); // Total
+        // *** DỜI VỊ TRÍ CỘT VÀO GẦN HƠN ***
+        addPillar(-3, -3, 0x00f2ff, 7); // Skincare
+        addPillar(3, -3, 0xff0055, 5);  // Health
+        addPillar(0, -5, 0xffff00, 9);  // Total
 
         // --- 5. ĐIỀU KHIỂN ---
         let moveState = { f: 0, r: 0 };
@@ -149,17 +152,16 @@
             camera.lookAt(target);
 
             if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 10 * dt; 
+                const speed = 8 * dt; // Giảm tốc độ một chút cho dễ điều khiển trong phòng nhỏ
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
                 
-                // Tính toán vị trí dự kiến
                 const nextPos = camera.position.clone();
                 nextPos.addScaledVector(dir, moveState.f * speed);
                 nextPos.addScaledVector(side, -moveState.r * speed);
 
-                // Giới hạn hình tròn (Bán kính ban công - 2m an toàn)
-                if (nextPos.length() < balconyRadius - 2) {
+                // Giới hạn hình tròn (Bán kính ban công - 1m an toàn)
+                if (nextPos.length() < balconyRadius - 1) {
                     camera.position.copy(nextPos);
                 }
             }
