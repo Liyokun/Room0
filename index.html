@@ -36,19 +36,22 @@
         floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
         scene.add(floorBase);
 
-        // --- 2. HỐ ĐEN (NGUYÊN LÝ THAM KHẢO - MÀU XANH NEON) ---
+        // --- 2. HỐ ĐEN (CẤU TRÚC CHUẨN - KHÔNG VÒNG) ---
         let portalCore, pSystem;
         function createEnergyPortal() {
-            // Lõi đen tuyệt đối
+            // Lõi đen
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
             scene.add(portalCore);
 
-            // Cấu trúc hạt lơ lửng theo file bạn gửi
+            // *** KHÔNG CÓ VÒNG RING ***
+
+            // HẠT NĂNG LƯỢNG (Copy y chang logic file tham khảo)
             const particlesGeo = new THREE.BufferGeometry();
             const pCount = 300; 
             const pArr = new Float32Array(pCount * 3);
             for(let i=0; i<pCount*3; i++) {
+                // Công thức rải hạt tự nhiên bạn thích:
                 pArr[i] = (Math.random() - 0.5) * 4; 
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
@@ -56,7 +59,7 @@
             // Màu Xanh Neon
             const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8 });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = -0.2; 
+            pSystem.position.y = -0.2; // Đặt thấp sát hố đen
             scene.add(pSystem);
         }
         createEnergyPortal();
@@ -110,7 +113,7 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // Hiệu ứng hạt lơ lửng xoay nhẹ
+            // Xoay nhẹ đám mây hạt (giữ nguyên vị trí các hạt, chỉ xoay trục Y)
             if(pSystem) pSystem.rotation.y += 0.005;
 
             look.lat = Math.max(-85, Math.min(85, look.lat));
