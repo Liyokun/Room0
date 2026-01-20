@@ -22,28 +22,20 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. SETUP SCENE CHÍNH (3D) ---
+        // --- 1. SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        scene.fog = null; // Không sương mù
+        scene.fog = null; 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.6, 3);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // QUAN TRỌNG: Tắt tự động xóa để vẽ chồng 2 scene lên nhau
-        renderer.autoClear = false; 
+        // Bỏ autoClear = false vì không dùng HUD nữa
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. SETUP SCENE HUD (MÀN HÌNH 2D ĐỂ VẼ MƯA) ---
-        // Scene này sẽ luôn nằm trên cùng, không bị phông nền 3D che khuất
-        const sceneHUD = new THREE.Scene();
-        // Camera trực giao (2D flat) cho HUD
-        const cameraHUD = new THREE.OrthographicCamera(-window.innerWidth / 2, window.innerWidth / 2, window.innerHeight / 2, -window.innerHeight / 2, 1, 10);
-        cameraHUD.position.z = 10;
-
-        // --- 3. MÔI TRƯỜNG 3D ---
+        // --- 2. MÔI TRƯỜNG ---
         const loader = new THREE.TextureLoader();
         loader.load('neoncity0.webp', (texture) => {
             const sky = new THREE.Mesh(
@@ -62,58 +54,68 @@
         const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
         rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- 4. TẠO MƯA TRÊN LỚP HUD (GIẢI PHÁP CHO PHÔNG NỀN) ---
-        const rainCount = 2000;
+        // --- 3. MƯA XA (DISTANT RAIN) ---
+        // Kỹ thuật: Đặt hạt mưa ở bán kính 90m-95m (sát ảnh nền 100m)
+        const rainCount = 3000;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        
+        const rainVel = [];
+
         for(let i=0; i<rainCount; i++) {
-            // Rải mưa trên toàn bộ diện tích màn hình 2D
-            rainPos[i*3] = (Math.random() - 0.5) * width; 
-            rainPos[i*3+1] = (Math.random() - 0.5) * height;
-            rainPos[i*3+2] = 0; // Z = 0 vì là màn hình phẳng
+            // Tạo vị trí ngẫu nhiên trong một vỏ cầu (spherical shell) ở xa
+            const r = 90 + Math.random() * 5; // Bán kính từ 90 đến 95
+            const theta = Math.random() * Math.PI * 2; // Góc ngang
+            const phi = Math.acos(2 * Math.random() - 1); // Góc đứng (để phân bố đều trên mặt cầu)
+
+            rainPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+            rainPos[i*3+1] = Math.random() * 100 - 50; // Chiều cao rơi
+            rainPos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+            
+            rainVel.push(0.5 + Math.random() * 0.5);
         }
         rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
         const rainMat = new THREE.PointsMaterial({
             color: 0xaaaaaa,
-            size: 3, // Kích thước hạt trên màn hình 2D (pixel)
+            size: 0.5, // Hạt mưa ở xa cần to hơn để thấy được
             transparent: true,
-            opacity: 0.6,
-            sizeAttenuation: false // Kích thước không đổi theo khoảng cách
+            opacity: 0.4
         });
         const rainSystem = new THREE.Points(rainGeo, rainMat);
-        // THÊM MƯA VÀO SCENE HUD, KHÔNG PHẢI SCENE 3D CHÍNH
-        sceneHUD.add(rainSystem);
+        scene.add(rainSystem);
 
-        // --- 5. HỐ ĐEN & HẠT ĐỎ (ĐÃ XÓA VÒNG XOAY) ---
+        // --- 4. HỐ ĐEN & HẠT TÍM (LƠ LỬNG) ---
         let portalCore, pSystem;
         function createVoidPortal() {
-            // Lõi đen
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-            portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; 
-            scene.add(portalCore);
+            portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; scene.add(portalCore);
 
-            // --- ĐÃ XÓA ĐOẠN CODE TẠO VÒNG RING Ở ĐÂY ---
+            const pCount = 150; // Thưa hơn
+            const pGeo = new THREE.BufferGeometry();
+            const pPos = new Float32Array(pCount * 3);
+            const pRnd = [];
 
-            // HẠT TĨNH (Cụm mây hạt đỏ/hồng)
-            const particlesGeo = new THREE.BufferGeometry();
-            const pCount = 300;
-            const pArr = new Float32Array(pCount * 3);
-            for(let i=0; i<pCount*3; i++) {
-                pArr[i] = (Math.random() - 0.5) * 4; 
+            for(let i=0; i<pCount; i++) {
+                pPos[i*3] = (Math.random() - 0.5) * 3;
+                pPos[i*3+1] = Math.random() * 1.5;
+                pPos[i*3+2] = (Math.random() - 0.5) * 3;
+                pRnd.push(Math.random() * 100);
             }
-            particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
             
-            const pMat = new THREE.PointsMaterial({ color: 0xff0055, size: 0.08, transparent: true, opacity: 0.8 });
-            pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = 0.2; 
+            const pMat = new THREE.PointsMaterial({
+                color: 0x4b0082, // Màu Tím tối
+                size: 0.1,
+                transparent: true, opacity: 0.9
+            });
+
+            pSystem = new THREE.Points(pGeo, pMat);
+            pSystem.position.set(0, 0.1, 0); 
+            pSystem.userData = { randoms: pRnd };
             scene.add(pSystem);
         }
         createVoidPortal();
 
-        // --- 6. CLICK ĐỂ VỀ INDEX ---
+        // --- 5. TƯƠNG TÁC ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -132,7 +134,7 @@
         window.addEventListener('click', onTouch);
         window.addEventListener('touchstart', onTouch);
 
-        // --- 7. ANIMATION ---
+        // --- 6. ANIMATION ---
         let moveState = { f: 0, r: 0 }, look = { lat: 0, lon: -90 }, interact = false, px, py, plon, plat;
         const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan' });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
@@ -145,22 +147,27 @@
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
+            const time = Date.now() * 0.001;
 
-            // --- ĐÃ XÓA HOẠT ẢNH XOAY VÒNG RING ---
-            
-            // Xoay nhẹ cụm hạt đỏ
-            if(pSystem) pSystem.rotation.y += 0.005; 
-
-            // ANIMATION MƯA TRÊN HUD (Rơi xuống trên màn hình 2D)
+            // ANIMATION MƯA XA
             const rPos = rainSystem.geometry.attributes.position.array;
-            const height = window.innerHeight;
             for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= 5; // Tốc độ rơi pixel/frame
-                if(rPos[i*3+1] < -height/2) { // Nếu rơi khỏi đáy màn hình
-                    rPos[i*3+1] = height/2; // Đưa lên đỉnh màn hình
+                rPos[i*3+1] -= rainVel[i]; 
+                if(rPos[i*3+1] < -50) { 
+                    rPos[i*3+1] = 50;
                 }
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
+
+            // ANIMATION HẠT TÍM (LƠ LỬNG)
+            const pPos = pSystem.geometry.attributes.position.array;
+            const pRnd = pSystem.userData.randoms;
+            pSystem.rotation.y -= 0.008; // Xoay ngược chiều
+
+            for(let i=0; i < pRnd.length; i++) {
+                pPos[i*3+1] = Math.abs(Math.sin(time * 0.5 + pRnd[i])) * 0.6 + 0.1;
+            }
+            pSystem.geometry.attributes.position.needsUpdate = true;
 
             // Camera
             look.lat = Math.max(-85, Math.min(85, look.lat));
@@ -174,31 +181,10 @@
                 if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
 
-            // RENDER KÉP QUAN TRỌNG:
-            // 1. Xóa màn hình
-            renderer.clear();
-            // 2. Vẽ cảnh 3D (Thành phố, sàn...)
             renderer.render(scene, camera);
-            // 3. Xóa bộ đệm độ sâu (để lớp sau vẽ đè lên lớp trước bất kể khoảng cách)
-            renderer.clearDepth();
-            // 4. Vẽ cảnh HUD (Mưa) lên trên cùng
-            renderer.render(sceneHUD, cameraHUD);
         }
         animate();
-        
-        // Cập nhật kích thước HUD khi resize màn hình
-        window.addEventListener('resize', () => { 
-            camera.aspect = window.innerWidth / window.innerHeight; 
-            camera.updateProjectionMatrix(); 
-            
-            cameraHUD.left = -window.innerWidth / 2;
-            cameraHUD.right = window.innerWidth / 2;
-            cameraHUD.top = window.innerHeight / 2;
-            cameraHUD.bottom = -window.innerHeight / 2;
-            cameraHUD.updateProjectionMatrix();
-
-            renderer.setSize(window.innerWidth, window.innerHeight); 
-        });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
