@@ -1,151 +1,132 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Quantum Neon City v4.4 - Ultimate</title>
+    <title>Neon City v4.9 - GitHub Stable</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
-        #joystick-zone {
-            position: absolute; bottom: 50px; left: 50px;
-            width: 120px; height: 120px; z-index: 100; opacity: 0.8;
-        }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
+        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 100; }
+        #status { position: absolute; top: 10px; width: 100%; text-align: center; color: #0ff; font-family: monospace; pointer-events: none; z-index: 200; }
     </style>
 </head>
 <body>
+    <div id="status">Đang khởi tạo hệ thống...</div>
     <div id="joystick-zone"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://yoannimmo.github.io/nipplejs/dist/nipplejs.js"></script>
 
     <script>
-        // --- 1. SETUP ENGINE ---
-        const scene = new THREE.Scene();
-        // Sương mù rất quan trọng để không thấy "mép" của sàn ảo
-        scene.fog = new THREE.Fog(0x000000, 10, 800); 
+        var scene, camera, renderer, joy;
+        var moveState = { f: 0, r: 0 };
+        var look = { lat: 0, lon: -90 };
+        var isMoving = false;
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        // TẦM MẮT 3m (Vẫn ở trong tâm vũ trụ)
-        camera.position.set(0, 3, 10); 
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x020205);
+                
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+                camera.position.set(0, 3, 10);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0x442266, 2.5));
-        const sun = new THREE.PointLight(0xffffff, 2, 1000);
-        sun.position.set(100, 100, 100);
-        scene.add(sun);
+                // Ánh sáng cường độ cao để đảm bảo thấy vật thể
+                scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-        // --- 2. PHONG CẢNH (DÙNG ĐỊA CHỈ TRỰC TIẾP CỦA BẠN) ---
-        const loader = new THREE.TextureLoader();
-        loader.setCrossOrigin('anonymous'); 
-
-        // Tôi dùng link trực tiếp mà bạn đã xác nhận là chạy được
-        const imageURL = 'https://liyokun.github.io/Room0/neoncity0.webp';
-
-        loader.load(
-            imageURL, 
-            function(texture) {
-                console.log("✅ TRẠM QUAN SÁT: Đã kết nối Neo Tokyo!");
-                const skyGeo = new THREE.SphereGeometry(1000, 60, 40);
-                const skyMat = new THREE.MeshBasicMaterial({ 
-                    map: texture, 
-                    side: THREE.BackSide 
-                });
-                const sky = new THREE.Mesh(skyGeo, skyMat);
-                scene.add(sky);
-            },
-            undefined,
-            function(err) {
-                console.error("❌ Lỗi CORS hoặc sai đường dẫn. Đang dùng ảnh vũ trụ thay thế...");
-                loader.load('https://threejs.org/examples/textures/equirectangular/galaxy.jpg', (tex) => {
-                    const sky = new THREE.Mesh(new THREE.SphereGeometry(1000, 60, 40), new THREE.MeshBasicMaterial({map: tex, side: THREE.BackSide}));
+                // 1. Tải ảnh bầu trời (Dùng link GitHub trực tiếp của bạn)
+                var loader = new THREE.TextureLoader();
+                loader.setCrossOrigin('anonymous');
+                loader.load('https://liyokun.github.io/Room0/neoncity0.webp', function(texture) {
+                    var sky = new THREE.Mesh(
+                        new THREE.SphereGeometry(1000, 60, 40),
+                        new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+                    );
                     scene.add(sky);
+                    document.getElementById('status').innerText = "Hệ thống: Neo Tokyo ONLINE";
+                    setTimeout(function(){ document.getElementById('status').style.display='none'; }, 3000);
+                }, undefined, function(e) {
+                    document.getElementById('status').innerText = "Cảnh báo: Lỗi nạp Texture, đang dùng chế độ dự phòng.";
                 });
+
+                // 2. Các vật thể Neon (Để chắc chắn bạn thấy gì đó khi di chuyển)
+                var cubeGeo = new THREE.BoxGeometry(2, 10, 2);
+                var cubeMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+                for(var i=0; i<10; i++) {
+                    var c = new THREE.Mesh(cubeGeo, cubeMat);
+                    c.position.set(Math.random()*100-50, 5, Math.random()*100-50);
+                    scene.add(c);
+                }
+
+                // 3. Cài đặt Joystick
+                joy = nipplejs.create({
+                    zone: document.getElementById('joystick-zone'),
+                    mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'cyan'
+                });
+                joy.on('move', function(e, d) {
+                    moveState.f = d.vector.y;
+                    moveState.r = d.vector.x;
+                });
+                joy.on('end', function() { moveState = { f: 0, r: 0 }; });
+
+                // 4. Xoay màn hình (Chuột/Cảm ứng)
+                var px, py, plon, plat, interact = false;
+                document.addEventListener('mousedown', function(e) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; });
+                document.addEventListener('mousemove', function(e) {
+                    if(interact) {
+                        look.lon = (px - e.clientX) * 0.2 + plon;
+                        look.lat = (e.clientY - py) * 0.2 + plat;
+                    }
+                });
+                document.addEventListener('mouseup', function() { interact = false; });
+                
+                // Hỗ trợ cảm ứng điện thoại
+                document.addEventListener('touchstart', function(e) { interact = true; px = e.touches[0].clientX; py = e.touches[0].clientY; plon = look.lon; plat = look.lat; });
+                document.addEventListener('touchmove', function(e) {
+                    if(interact) {
+                        look.lon = (px - e.touches[0].clientX) * 0.2 + plon;
+                        look.lat = (e.touches[0].clientY - py) * 0.2 + plat;
+                    }
+                });
+                document.addEventListener('touchend', function() { interact = false; });
+
+                animate();
+            } catch(err) {
+                document.getElementById('status').innerText = "Lỗi khởi tạo: " + err.message;
             }
-        );
-
-        // --- 3. VẬT THỂ (PLANETS & PILLARS) ---
-        const planets = [];
-        function createPlanet(r, x, y, z, color) {
-            const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(r, 32, 32),
-                new THREE.MeshStandardMaterial({ color: color, metalness: 0.6, roughness: 0.5, emissive: color, emissiveIntensity: 0.1 })
-            );
-            mesh.position.set(x, y, z);
-            scene.add(mesh);
-            planets.push(mesh);
         }
-        // Đặt ở tọa độ Z âm để nhìn thấy ngay trước mặt
-        createPlanet(15, -100, 40, -150, 0x2244ff); 
-        createPlanet(8, 80, 20, -100, 0xff6622);
 
-        function addPillar(x, z, color, h) {
-            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, h, 16), new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.8 }));
-            mesh.position.set(x, h/2, z);
-            scene.add(mesh);
-        }
-        addPillar(-6, -6, 0x00f2ff, 7); 
-        addPillar(6, -6, 0xff0055, 5);  
-        addPillar(0, -15, 0xffff00, 10);
-
-        // Bụi vũ trụ
-        const starsGeo = new THREE.BufferGeometry();
-        const posArray = new Float32Array(4000 * 3);
-        for(let i=0; i<4000*3; i++) posArray[i] = (Math.random() - 0.5) * 400;
-        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.05, color: 0x00f2ff, transparent: true, opacity: 0.6 }));
-        scene.add(starField);
-
-        // --- 4. ĐIỀU KHIỂN ---
-        let moveState = { f: 0, r: 0 };
-        let look = { lat: 0, lon: -90 };
-        let interact = false;
-        let px, py, plon, plat;
-
-        const joy = nipplejs.create({ 
-            zone: document.getElementById('joystick-zone'), 
-            mode: 'static', 
-            position: {left: '60px', bottom: '60px'}, 
-            color: '#0ff' 
-        });
-        joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
-        joy.on('end', () => { moveState = { f: 0, r: 0 }; });
-
-        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; } });
-        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; } });
-        document.addEventListener('pointerup', () => interact = false);
-
-        // --- 5. ANIMATION ---
-        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
-            const dt = clock.getDelta();
-
+            
             look.lat = Math.max(-85, Math.min(85, look.lat));
-            const phi = THREE.MathUtils.degToRad(90 - look.lat);
-            const theta = THREE.MathUtils.degToRad(look.lon);
-            const target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
+            var phi = THREE.MathUtils.degToRad(90 - look.lat);
+            var theta = THREE.MathUtils.degToRad(look.lon);
+            var target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
             camera.lookAt(target);
 
-            if (moveState.f !== 0 || moveState.r !== 0) {
-                const speed = 18 * dt;
-                const dir = new THREE.Vector3();
+            if(moveState.f !== 0 || moveState.r !== 0) {
+                var dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
                 dir.y = 0; dir.normalize();
-                const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-                camera.position.addScaledVector(dir, moveState.f * speed);
-                camera.position.addScaledVector(side, -moveState.r * speed);
+                var side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+                camera.position.addScaledVector(dir, moveState.f * 0.5);
+                camera.position.addScaledVector(side, -moveState.r * 0.5);
             }
 
-            starField.rotation.y += 0.0002;
             renderer.render(scene, camera);
         }
-        animate();
 
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        window.onload = init;
+        window.onresize = function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
     </script>
 </body>
 </html>
