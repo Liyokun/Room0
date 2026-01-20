@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Quantum Neon City v4.1</title>
+    <title>Quantum Neon City v4.3 - Final</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         #joystick-zone {
@@ -16,113 +16,109 @@
 <body>
     <div id="joystick-zone"></div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 
-    <script type="module">
-        import * as THREE from 'three';
-
-        // --- 1. KHỞI TẠO ENGINE ---
+    <script>
+        // --- 1. SETUP ENGINE ---
         const scene = new THREE.Scene();
         scene.fog = new THREE.Fog(0x000000, 10, 500); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        camera.position.set(0, 3.0, 10); 
+        camera.position.set(0, 3.0, 10); // Tầm mắt cao 3m
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Ánh sáng
         const ambientLight = new THREE.AmbientLight(0x442266, 2); 
         scene.add(ambientLight);
         const sunLight = new THREE.PointLight(0xffffff, 3, 500);
         sunLight.position.set(50, 100, 50);
         scene.add(sunLight);
 
-        // --- 2. PHONG CẢNH THÀNH PHỐ (NEON CITY 360) ---
+        // --- 2. PHONG CẢNH (DÙNG LINK TRỰC TIẾP CỦA BẠN) ---
         const loader = new THREE.TextureLoader();
+        
+        // Lệnh cực kỳ quan trọng để GitHub cho phép Three.js lấy ảnh
+        loader.setCrossOrigin('anonymous'); 
 
-        // ✅ DÒNG ĐÃ SỬA ĐÚNG
-        loader.load('./neoncity0.webp', function(texture) {
-            const skyGeo = new THREE.SphereGeometry(800, 60, 40);
-            const skyMat = new THREE.MeshBasicMaterial({ 
-                map: texture, 
-                side: THREE.BackSide 
-            });
-            const sky = new THREE.Mesh(skyGeo, skyMat);
-            scene.add(sky);
-        });
+        // Link trực tiếp bạn đã kiểm tra thành công
+        const imageURL = 'https://liyokun.github.io/Room0/neoncity0.webp'; 
 
-        // --- 3. THÊM CÁC HÀNH TINH ẢO (PLANETS) ---
+        loader.load(
+            imageURL, 
+            function(texture) {
+                console.log("Thành phố Neo Tokyo đã lên đèn!");
+                const sky = new THREE.Mesh(
+                    new THREE.SphereGeometry(800, 60, 40),
+                    new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide })
+                );
+                scene.add(sky);
+            },
+            undefined,
+            function(err) {
+                console.error("Vẫn gặp lỗi CORS. Đang dùng ảnh vũ trụ dự phòng...");
+                loader.load('https://threejs.org/examples/textures/equirectangular/galaxy.jpg', (tex) => {
+                    const sky = new THREE.Mesh(new THREE.SphereGeometry(800, 60, 40), new THREE.MeshBasicMaterial({map: tex, side: THREE.BackSide}));
+                    scene.add(sky);
+                });
+            }
+        );
+
+        // --- 3. CÁC HÀNH TINH & CỘT DỮ LIỆU ---
         const planets = [];
-        function createPlanet(radius, x, y, z, color) {
-            const geo = new THREE.SphereGeometry(radius, 32, 32);
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: color, 
-                metalness: 0.6, 
-                roughness: 0.5,
-                emissive: color,
-                emissiveIntensity: 0.1
-            });
-            const planet = new THREE.Mesh(geo, mat);
-            planet.position.set(x, y, z);
-            scene.add(planet);
-            planets.push(planet);
+        function createPlanet(r, x, y, z, color) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(r, 32, 32),
+                new THREE.MeshStandardMaterial({ color: color, metalness: 0.6, roughness: 0.5, emissive: color, emissiveIntensity: 0.1 })
+            );
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            planets.push(mesh);
         }
-
         createPlanet(15, -100, 40, -150, 0x2244ff); 
         createPlanet(8, 80, 20, -100, 0xff6622);  
         createPlanet(5, -40, 60, -60, 0x88ff88);    
 
-        // --- 4. SAO & BỤI ---
+        // Bụi sao
         const starsGeo = new THREE.BufferGeometry();
         const starsCount = 4000; 
         const posArray = new Float32Array(starsCount * 3);
         for(let i=0; i<starsCount*3; i++) posArray[i] = (Math.random() - 0.5) * 300;
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const starsMat = new THREE.PointsMaterial({ size: 0.04, color: 0x00f2ff, transparent: true, opacity: 0.6 });
-        const starField = new THREE.Points(starsGeo, starsMat);
+        const starField = new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 0.04, color: 0x00f2ff, transparent: true, opacity: 0.6 }));
         scene.add(starField);
 
-        // --- 5. ĐIỀU KHIỂN ---
+        function addPillar(x, z, color, h) {
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, h, 16), new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.8 }));
+            mesh.position.set(x, h/2, z);
+            scene.add(mesh);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.03, 16, 100), new THREE.MeshBasicMaterial({ color: color }));
+            ring.rotation.x = Math.PI/2; ring.position.set(x, 0.05, z);
+            scene.add(ring);
+        }
+        addPillar(-6, -6, 0x00f2ff, 7); 
+        addPillar(6, -6, 0xff0055, 5);  
+        addPillar(0, -15, 0xffff00, 10); 
+
+        // --- 4. ĐIỀU KHIỂN ---
         let moveState = { f: 0, r: 0 };
         let look = { lat: 0, lon: -90 };
         let interact = false;
         let px, py, plon, plat;
 
-        const joy = nipplejs.create({ 
-            zone: document.getElementById('joystick-zone'), 
-            mode: 'static', 
-            position: {left: '60px', bottom: '60px'}, 
-            color: '#00f2ff' 
-        });
+        const joy = nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: '#00f2ff' });
         joy.on('move', (e, d) => { moveState.f = d.vector.y; moveState.r = d.vector.x; });
         joy.on('end', () => { moveState = { f: 0, r: 0 }; });
 
-        document.addEventListener('pointerdown', e => { 
-            if(e.clientX > 200) { 
-                interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; 
-            }
-        });
-        document.addEventListener('pointermove', e => {
-            if (interact) {
-                look.lon = (px - e.clientX) * 0.15 + plon;
-                look.lat = (e.clientY - py) * 0.15 + plat;
-            }
-        });
+        document.addEventListener('pointerdown', e => { if(e.clientX > 200) { interact = true; px = e.clientX; py = e.clientY; plon = look.lon; plat = look.lat; } });
+        document.addEventListener('pointermove', e => { if (interact) { look.lon = (px - e.clientX) * 0.15 + plon; look.lat = (e.clientY - py) * 0.15 + plat; } });
         document.addEventListener('pointerup', () => interact = false);
 
-        // --- 6. GAME LOOP ---
+        // --- 5. ANIMATION LOOP ---
         const clock = new THREE.Clock();
-
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
@@ -137,9 +133,7 @@
                 const speed = 18 * dt;
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
-                dir.y = 0;
-                dir.normalize();
-                
+                dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
                 camera.position.addScaledVector(dir, moveState.f * speed);
                 camera.position.addScaledVector(side, -moveState.r * speed);
@@ -147,16 +141,11 @@
 
             planets.forEach((p, i) => { p.rotation.y += 0.001 * (i + 1); });
             starField.rotation.y += 0.0002;
-
             renderer.render(scene, camera);
         }
         animate();
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
