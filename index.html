@@ -1,428 +1,159 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🌆 Neon City 360° - FPS Explorer</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            width: 100vw; 
-            height: 100vh; 
-            overflow: hidden; 
-            background: #000;
-            font-family: Arial, sans-serif;
-            touch-action: none;
-        }
-        
-        #canvas { display: block; width: 100%; height: 100%; }
-        
-        /* HUD Hiển Thị */
-        #hud {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid #00f2ff;
-            color: #00f2ff;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            z-index: 100;
-            line-height: 1.6;
-            border-radius: 8px;
-        }
-        
-        #controls {
-            position: fixed;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid #ff0055;
-            color: #ff0055;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            z-index: 100;
-            border-radius: 8px;
-        }
-        
-        /* Joystick Zone */
-        #joystick-zone {
-            position: fixed;
-            bottom: 50px;
-            right: 50px;
-            width: 150px;
-            height: 150px;
-            z-index: 50;
-        }
-        
-        /* Loading Screen */
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-            color: #00f2ff;
-            font-family: 'Courier New', monospace;
-            text-align: center;
-        }
-        
-        .loading-spinner {
-            border: 3px solid #00f2ff;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon City FPS 360</title>
+<style>
+body { margin:0; overflow:hidden; background:black; touch-action:none; }
+#joystick-zone {
+    position:absolute; bottom:50px; left:50px;
+    width:120px; height:120px; z-index:100;
+}
+</style>
 </head>
 <body>
 
-<!-- Loading Screen -->
-<div id="loading">
-    <div style="text-align: center;">
-        <div class="loading-spinner"></div>
-        <p>🌆 Neon City đang khởi động...</p>
-        <p style="font-size: 11px; color: #888; margin-top: 20px;">Đang load 360° panorama...</p>
-    </div>
-</div>
-
-<!-- HUD -->
-<div id="hud">
-    <div style="color: #ffff00; font-weight: bold; margin-bottom: 10px;">📍 CAMERA</div>
-    <div>X: <span id="posX">0</span></div>
-    <div>Y: <span id="posY">1.6</span></div>
-    <div>Z: <span id="posZ">0</span></div>
-    <div style="margin-top: 10px; color: #00ff00; font-weight: bold;">🎯 VIEW</div>
-    <div>Pitch: <span id="pitch">0</span>°</div>
-    <div>Yaw: <span id="yaw">0</span>°</div>
-</div>
-
-<!-- Controls Info -->
-<div id="controls">
-    <div style="color: #ffff00; font-weight: bold; margin-bottom: 8px;">⌨️ ĐIỀU KHIỂN</div>
-    <div>W/↑ = Tiến</div>
-    <div>S/↓ = Lùi</div>
-    <div>A/← = Trái</div>
-    <div>D/→ = Phải</div>
-    <div style="margin-top: 8px; color: #00ff00;">🖱️ Kéo chuột = Nhìn quanh</div>
-    <div style="margin-top: 8px; color: #ff0055; font-size: 11px;">📱 Joystick: Di chuyển</div>
-</div>
-
-<!-- Joystick Zone -->
 <div id="joystick-zone"></div>
 
-<!-- Canvas Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://yoannimmo.github.io/nipplejs/dist/nipplejs.js"></script>
 
 <script>
-    // ============================================
-    // KHỞI TẠO THREE.JS ENGINE
-    // ============================================
-    
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.Fog(0x000000, 50, 500);
+/* ================== SETUP ================== */
 
-    const camera = new THREE.PerspectiveCamera(
-        75, 
-        window.innerWidth / window.innerHeight, 
-        0.1, 
-        2000
-    );
-    camera.position.set(0, 1.6, 0); // Cao độ mắt người
+const scene = new THREE.Scene();
 
-    const renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        alpha: true 
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
+/* ❌ TẮT FOG + BACKGROUND (rất quan trọng) */
+// scene.background = new THREE.Color(0x000205);
+// scene.fog = new THREE.Fog(0x000205, 1, 50);
 
-    // ============================================
-    // LIGHTING
-    // ============================================
-    
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-    scene.add(ambientLight);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 3000);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(100, 100, 50);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+/* 🔴 CAMERA PHẢI Ở TÂM QUẢ CẦU */
+camera.position.set(0, 1.6, 0);
 
-    // ============================================
-    // LỰA CHỌN: SỬ DỤNG GITHUB RAW IMAGE
-    // ============================================
-    
-    // Hãy thay YOUR_USERNAME và YOUR_REPO
-    const GITHUB_USERNAME = 'liyokun'; // ← THAY TẬT CẢ
-    const GITHUB_REPO = 'Room0';       // ← THAY TẠI ĐÂY
-    
-    const imageURL = `https://cdn.jsdelivr.net/gh/${GITHUB_USERNAME}/${GITHUB_REPO}@main/neoncity0.webp`;
-    
-    // Hoặc nếu bạn có link trực tiếp khác:
-    // const imageURL = 'https://liyokun.github.io/Room0/neoncity0.webp';
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
 
-    // ============================================
-    // TẠO SKYBOX 360° (LẮP ẢNH)
-    // ============================================
-    
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin('anonymous');
+/* ================== LOAD ẢNH 360 ================== */
 
-    textureLoader.load(
-        imageURL,
-        function(texture) {
-            console.log('✅ Ảnh Neon City đã load thành công!');
-            
-            // Tạo sphere bao quanh toàn bộ scene
-            const skyGeometry = new THREE.SphereGeometry(
-                400,    // Bán kính lớn
-                64,     // Độ phân giải ngang
-                32      // Độ phân giải dọc
-            );
-            
-            const skyMaterial = new THREE.MeshBasicMaterial({
-                map: texture,
-                side: THREE.BackSide,  // Render phía trong
-                toneMappingExposure: 1
-            });
-            
-            const skyMesh = new THREE.Mesh(skyGeometry, skyMaterial);
-            scene.add(skyMesh);
-            
-            document.getElementById('loading').style.display = 'none';
-        },
-        function(progress) {
-            // Tiến độ loading
-            const percent = Math.round((progress.loaded / progress.total) * 100);
-            const loadText = document.querySelector('#loading p:last-child');
-            if(loadText) loadText.textContent = `Loading... ${percent}%`;
-        },
-        function(error) {
-            console.error('❌ Lỗi load ảnh:', error);
-            document.querySelector('#loading p:last-child').textContent = 
-                '❌ Lỗi load ảnh. Kiểm tra URL!';
-        }
-    );
+const loader = new THREE.TextureLoader();
+loader.setCrossOrigin('anonymous');
 
-    // ============================================
-    // CÁC VẬT THỂ 3D (TRANG TRÍ)
-    // ============================================
-    
-    // Tạo các hành tinh (giống Neon City)
-    function createPlanet(radius, x, y, z, color) {
-        const geometry = new THREE.SphereGeometry(radius, 32, 32);
-        const material = new THREE.MeshStandardMaterial({
-            color: color,
-            metalness: 0.7,
-            roughness: 0.3,
-            emissive: color,
-            emissiveIntensity: 0.2
-        });
-        
-        const planet = new THREE.Mesh(geometry, material);
-        planet.position.set(x, y, z);
-        planet.castShadow = true;
-        planet.receiveShadow = true;
-        scene.add(planet);
-        
-        return planet;
-    }
+loader.load(
+  'https://liyokun.github.io/Room0/neoncity0.webp',
 
-    // Thêm một vài "tòa nhà" (spheres with glow)
-    const planets = [];
-    planets.push(createPlanet(8, -80, 30, 150, 0x2244ff));   // Blue planet
-    planets.push(createPlanet(5, 70, 50, 120, 0xff0055));    // Pink planet
-    planets.push(createPlanet(6, -50, 40, 100, 0x00ff88));   // Green planet
-    planets.push(createPlanet(4, 90, 20, 80, 0xffff00));     // Yellow planet
+  function(texture){
 
-    // Tạo các trụ sáng neon
-    function createNeonPillar(x, z, color, height) {
-        const pillarGeo = new THREE.CylinderGeometry(1.5, 1.5, height, 16);
-        const pillarMat = new THREE.MeshBasicMaterial({
-            color: color,
-            wireframe: true,
-            transparent: true,
-            opacity: 0.8
-        });
-        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-        pillar.position.set(x, height / 2, z);
-        scene.add(pillar);
+    console.log("✅ ẢNH 360 LOAD OK");
 
-        // Thêm halo effect
-        const ringGeo = new THREE.TorusGeometry(2.5, 0.1, 16, 100);
-        const ringMat = new THREE.MeshBasicMaterial({ color: color });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.set(x, 0.5, z);
-        scene.add(ring);
-    }
-
-    createNeonPillar(0, 0, 0x00f2ff, 20);
-    createNeonPillar(-40, -30, 0xff0055, 15);
-    createNeonPillar(40, -30, 0xffff00, 18);
-
-    // ============================================
-    // HỆ THỐNG ĐIỀU KHIỂN
-    // ============================================
-    
-    let keys = {};
-    let mouse = { down: false, x: 0, y: 0 };
-    let cameraRotation = { x: 0, y: 0 };
-
-    // Bàn phím
-    window.addEventListener('keydown', (e) => {
-        keys[e.key.toLowerCase()] = true;
+    const skyGeo = new THREE.SphereGeometry(1200, 64, 64);
+    const skyMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        side: THREE.BackSide
     });
 
-    window.addEventListener('keyup', (e) => {
-        keys[e.key.toLowerCase()] = false;
-    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
 
-    // Chuột
-    renderer.domElement.addEventListener('mousedown', (e) => {
-        mouse.down = true;
-        renderer.domElement.requestPointerLock?.();
-    });
+    /* 🔴 XOAY 180° ĐỂ ĐÚNG HƯỚNG ẢNH */
+    sky.rotation.y = Math.PI;
 
-    renderer.domElement.addEventListener('mousemove', (e) => {
-        if (mouse.down) {
-            cameraRotation.y -= e.movementX * 0.005;
-            cameraRotation.x -= e.movementY * 0.005;
-            
-            // Clamp pitch
-            cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.x));
-        }
-    });
+    scene.add(sky);
+  },
 
-    document.addEventListener('mouseup', () => {
-        mouse.down = false;
-    });
+  undefined,
 
-    // Joystick (Mobile)
-    const joystick = nipplejs.create({
-        zone: document.getElementById('joystick-zone'),
-        mode: 'static',
-        position: { right: '60px', bottom: '60px' },
-        color: '#00f2ff',
-        size: 150
-    });
+  function(err){
+    console.error("❌ LỖI LOAD ẢNH:", err);
+  }
+);
 
-    let joystickInput = { forward: 0, strafe: 0 };
+/* ================== HIỆU ỨNG BỤI SAO (GIỮ TỪ FILE TỐT) ================== */
 
-    joystick.on('move', (evt, data) => {
-        joystickInput.forward = data.vector.y;
-        joystickInput.strafe = data.vector.x;
-    });
+const starsGeo = new THREE.BufferGeometry();
+const starsCount = 1000;
+const posArray = new Float32Array(starsCount * 3);
+for(let i=0;i<starsCount*3;i++) posArray[i] = (Math.random()-0.5)*200;
+starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray,3));
+const starField = new THREE.Points(
+    starsGeo,
+    new THREE.PointsMaterial({ size:0.05, color:0xffffff, transparent:true, opacity:0.5 })
+);
+scene.add(starField);
 
-    joystick.on('end', () => {
-        joystickInput = { forward: 0, strafe: 0 };
-    });
+/* ================== ĐIỀU KHIỂN FPS + JOYSTICK (GIỮ NGUYÊN PHONG CÁCH BẠN) ================== */
 
-    // ============================================
-    // GAME LOOP
-    // ============================================
-    
-    const clock = new THREE.Clock();
-    const moveSpeed = 15; // Tốc độ di chuyển
+let moveState = { f:0, r:0 };
+let look = { lat:0, lon:-90 };
+let interact = false;
+let px, py, plon, plat;
 
-    function animate() {
-        requestAnimationFrame(animate);
-        const deltaTime = clock.getDelta();
+const joy = nipplejs.create({
+  zone: document.getElementById('joystick-zone'),
+  mode:'static',
+  position:{ left:'60px', bottom:'60px' },
+  color:'cyan'
+});
 
-        // Xoay camera theo chuột
-        const euler = new THREE.Euler(cameraRotation.x, cameraRotation.y, 0, 'YXZ');
-        camera.quaternion.setFromEuler(euler);
+joy.on('move', (e,d)=>{ moveState.f = d.vector.y; moveState.r = d.vector.x; });
+joy.on('end', ()=> moveState = { f:0, r:0 });
 
-        // Di chuyển camera
-        const direction = new THREE.Vector3();
-        camera.getWorldDirection(direction);
-        direction.y = 0;
-        direction.normalize();
+document.addEventListener('pointerdown', e=>{
+  if(e.clientX > 200){
+    interact = true;
+    px=e.clientX; py=e.clientY;
+    plon=look.lon; plat=look.lat;
+  }
+});
+document.addEventListener('pointermove', e=>{
+  if(interact){
+    look.lon = (px - e.clientX)*0.15 + plon;
+    look.lat = (e.clientY - py)*0.15 + plat;
+  }
+});
+document.addEventListener('pointerup', ()=> interact=false);
 
-        const right = new THREE.Vector3();
-        right.crossVectors(camera.up, direction).normalize();
+/* ================== LOOP ================== */
 
-        const forward = direction.clone();
+const clock = new THREE.Clock();
 
-        // Từ bàn phím
-        if (keys['w'] || keys['arrowup']) {
-            camera.position.addScaledVector(forward, moveSpeed * deltaTime);
-        }
-        if (keys['s'] || keys['arrowdown']) {
-            camera.position.addScaledVector(forward, -moveSpeed * deltaTime);
-        }
-        if (keys['a'] || keys['arrowleft']) {
-            camera.position.addScaledVector(right, -moveSpeed * deltaTime);
-        }
-        if (keys['d'] || keys['arrowright']) {
-            camera.position.addScaledVector(right, moveSpeed * deltaTime);
-        }
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
 
-        // Từ joystick
-        camera.position.addScaledVector(forward, joystickInput.forward * moveSpeed * deltaTime);
-        camera.position.addScaledVector(right, -joystickInput.strafe * moveSpeed * deltaTime);
+  look.lat = Math.max(-85, Math.min(85, look.lat));
+  const phi = THREE.MathUtils.degToRad(90 - look.lat);
+  const theta = THREE.MathUtils.degToRad(look.lon);
+  const target = new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position);
+  camera.lookAt(target);
 
-        // Giới hạn vùng di chuyển
-        const limit = 200;
-        camera.position.x = Math.max(-limit, Math.min(limit, camera.position.x));
-        camera.position.z = Math.max(-limit, Math.min(limit, camera.position.z));
-        camera.position.y = Math.max(0.5, Math.min(100, camera.position.y));
+  if(moveState.f || moveState.r){
+    const speed = 10 * dt;
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    dir.y = 0; dir.normalize();
 
-        // Xoay các hành tinh
-        planets.forEach((p, i) => {
-            p.rotation.x += 0.0005 * (i + 1);
-            p.rotation.y += 0.001 * (i + 1);
-        });
+    const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
 
-        // Cập nhật HUD
-        document.getElementById('posX').textContent = camera.position.x.toFixed(1);
-        document.getElementById('posY').textContent = camera.position.y.toFixed(1);
-        document.getElementById('posZ').textContent = camera.position.z.toFixed(1);
-        document.getElementById('pitch').textContent = (cameraRotation.x * 180 / Math.PI).toFixed(1);
-        document.getElementById('yaw').textContent = (cameraRotation.y * 180 / Math.PI).toFixed(1);
+    camera.position.addScaledVector(dir, moveState.f * speed);
+    camera.position.addScaledVector(side, -moveState.r * speed);
+  }
 
-        renderer.render(scene, camera);
-    }
+  starField.rotation.y += 0.0003;
 
-    animate();
+  renderer.render(scene, camera);
+}
 
-    // ============================================
-    // RESIZE HANDLER
-    // ============================================
-    
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+animate();
 
-    // ============================================
-    // KHỞI ĐỘ (CONSOLE LOG)
-    // ============================================
-    
-    console.log('%c🌆 Neon City 360° FPS Explorer', 'font-size: 20px; color: #00f2ff; font-weight: bold;');
-    console.log('%cImage URL: ' + imageURL, 'color: #00ff00;');
-    console.log('%cNhấn F12 nếu thấy lỗi!', 'color: #ff0055;');
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
-
 </body>
 </html>
