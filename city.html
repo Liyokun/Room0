@@ -25,7 +25,6 @@
         // --- 1. SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000205);
-        // KHÔNG CÓ SƯƠNG MÙ
         scene.fog = null;
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -54,42 +53,34 @@
         const rail = new THREE.Mesh(new THREE.TorusGeometry(8, 0.2, 16, 100), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
         rail.rotation.x = Math.PI / 2; rail.position.y = 1.0; scene.add(rail);
 
-        // --- 3. MƯA (ĐƠN GIẢN & HIỆU QUẢ) ---
-        const rainCount = 2000;
+        // --- 3. MƯA XA (DISTANT RAIN) ---
+        const rainCount = 3000;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
-        
+        const rainVel = [];
         for(let i=0; i<rainCount; i++) {
-            rainPos[i*3] = (Math.random() - 0.5) * 40; // Rải rộng 40m
-            rainPos[i*3+1] = Math.random() * 20;       // Cao 20m
-            rainPos[i*3+2] = (Math.random() - 0.5) * 40;
+            const r = 90 + Math.random() * 5; 
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            rainPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+            rainPos[i*3+1] = Math.random() * 100 - 50;
+            rainPos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+            rainVel.push(0.5 + Math.random() * 0.5);
         }
         rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-        const rainMat = new THREE.PointsMaterial({
-            color: 0xaaaaaa,
-            size: 0.1, // Hạt mưa to rõ
-            transparent: true,
-            opacity: 0.6
-        });
+        const rainMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.5, transparent: true, opacity: 0.4 });
         const rainSystem = new THREE.Points(rainGeo, rainMat);
         scene.add(rainSystem);
 
-        // --- 4. HỐ ĐEN (COPY TỪ CODE THAM KHẢO + CHỈNH MÀU ĐỎ/HỒNG) ---
-        let portalCore, portalRing, pSystem;
+        // --- 4. HỐ ĐEN (NGUYÊN LÝ THAM KHẢO - MÀU ĐỎ/HỒNG) ---
+        let portalCore, pSystem;
         function createVoidPortal() {
             // Lõi đen
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.05; 
             scene.add(portalCore);
 
-            // Vòng năng lượng
-            const ringGeo = new THREE.RingGeometry(1.5, 2.2, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0055, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
-            portalRing = new THREE.Mesh(ringGeo, ringMat);
-            portalRing.rotation.x = -Math.PI / 2; portalRing.position.y = -0.04;
-            scene.add(portalRing);
-
-            // HẠT TĨNH (STATIC PARTICLES) - MÀU ĐỎ/HỒNG NHƯ MẪU
+            // Cấu trúc hạt lơ lửng xoay theo file tham khảo
             const particlesGeo = new THREE.BufferGeometry();
             const pCount = 300;
             const pArr = new Float32Array(pCount * 3);
@@ -98,15 +89,15 @@
             }
             particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
             
-            // Màu Hồng Đậm (0xff0055)
+            // Màu Hồng Đỏ
             const pMat = new THREE.PointsMaterial({ color: 0xff0055, size: 0.08, transparent: true, opacity: 0.8 });
             pSystem = new THREE.Points(particlesGeo, pMat);
-            pSystem.position.y = 0.2; // Lơ lửng
+            pSystem.position.y = 0.2; 
             scene.add(pSystem);
         }
         createVoidPortal();
 
-        // --- 5. CLICK ĐỂ VỀ INDEX ---
+        // --- 5. CLICK ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -139,21 +130,17 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // 1. XOAY VÒNG & HẠT (CHUYỂN ĐỘNG NHẸ)
-            if(portalRing) portalRing.rotation.z -= 0.02;
-            if(pSystem) pSystem.rotation.y += 0.005; // Xoay nhẹ nhàng cả cụm
+            // Hiệu ứng hạt lơ lửng xoay nhẹ
+            if(pSystem) pSystem.rotation.y += 0.005;
 
-            // 2. MƯA RƠI
+            // Mưa xa
             const rPos = rainSystem.geometry.attributes.position.array;
             for(let i=0; i<rainCount; i++) {
-                rPos[i*3+1] -= 0.5; // Tốc độ rơi
-                if(rPos[i*3+1] < -5) { // Chạm đất
-                    rPos[i*3+1] = 20; // Lên đỉnh
-                }
+                rPos[i*3+1] -= 0.5;
+                if(rPos[i*3+1] < -50) rPos[i*3+1] = 50;
             }
             rainSystem.geometry.attributes.position.needsUpdate = true;
 
-            // Camera
             look.lat = Math.max(-85, Math.min(85, look.lat));
             const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
             camera.lookAt(new THREE.Vector3().setFromSphericalCoords(1, phi, theta).add(camera.position));
@@ -164,7 +151,6 @@
                 const nextPos = camera.position.clone().addScaledVector(dir, moveState.f * speed).addScaledVector(side, -moveState.r * speed);
                 if (nextPos.length() < 7) camera.position.copy(nextPos);
             }
-
             renderer.render(scene, camera);
         }
         animate();
