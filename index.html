@@ -36,39 +36,28 @@
         floorBase.rotation.x = -Math.PI / 2; floorBase.position.y = -0.5;
         scene.add(floorBase);
 
-        // --- 2. HỐ ĐEN & HẠT NĂNG LƯỢNG (TỰ NHIÊN HƠN) ---
-        let portalCore, particlesSystem;
+        // --- 2. HỐ ĐEN (NGUYÊN LÝ THAM KHẢO - MÀU XANH NEON) ---
+        let portalCore, pSystem;
         function createEnergyPortal() {
+            // Lõi đen tuyệt đối
             portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = -0.4;
             scene.add(portalCore);
 
-            // LOGIC MỚI: Đám mây tự nhiên (giống bên City)
-            const pCount = 150; // Giảm số lượng cho thưa hơn
-            const pGeo = new THREE.BufferGeometry();
-            const pPos = new Float32Array(pCount * 3);
-            const pRnd = []; 
-
-            for(let i=0; i<pCount; i++) {
-                // Rải hạt trong một vùng không gian hình hộp chữ nhật bẹt
-                pPos[i*3] = (Math.random() - 0.5) * 3;   // Rộng X
-                pPos[i*3+1] = Math.random() * 1.5;       // Cao Y
-                pPos[i*3+2] = (Math.random() - 0.5) * 3; // Sâu Z
-                
-                pRnd.push(Math.random() * 100); // Pha dao động riêng
+            // Cấu trúc hạt lơ lửng theo file bạn gửi
+            const particlesGeo = new THREE.BufferGeometry();
+            const pCount = 300; 
+            const pArr = new Float32Array(pCount * 3);
+            for(let i=0; i<pCount*3; i++) {
+                pArr[i] = (Math.random() - 0.5) * 4; 
             }
-            pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+            particlesGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
             
-            const pMat = new THREE.PointsMaterial({
-                color: 0x00f2ff, // Cyan sáng
-                size: 0.12,      
-                transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending
-            });
-
-            particlesSystem = new THREE.Points(pGeo, pMat);
-            particlesSystem.position.set(0, -0.2, 0); 
-            particlesSystem.userData = { randoms: pRnd };
-            scene.add(particlesSystem);
+            // Màu Xanh Neon
+            const pMat = new THREE.PointsMaterial({ color: 0x00f2ff, size: 0.08, transparent: true, opacity: 0.8 });
+            pSystem = new THREE.Points(particlesGeo, pMat);
+            pSystem.position.y = -0.2; 
+            scene.add(pSystem);
         }
         createEnergyPortal();
 
@@ -88,7 +77,7 @@
         const starField = new THREE.Points(starsGeo, starsMat);
         scene.add(starField);
 
-        // --- 4. TƯƠNG TÁC ---
+        // --- 4. CLICK ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         function onTouch(event) {
@@ -120,7 +109,9 @@
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
-            const time = Date.now() * 0.001;
+
+            // Hiệu ứng hạt lơ lửng xoay nhẹ
+            if(pSystem) pSystem.rotation.y += 0.005;
 
             look.lat = Math.max(-85, Math.min(85, look.lat));
             const phi = THREE.MathUtils.degToRad(90 - look.lat), theta = THREE.MathUtils.degToRad(look.lon);
@@ -133,25 +124,12 @@
                 if(nextPos.length() < 50) camera.position.copy(nextPos);
             }
             
-            // ANIMATION HẠT (Lơ lửng nhẹ nhàng)
-            const pPos = particlesSystem.geometry.attributes.position.array;
-            const pRnd = particlesSystem.userData.randoms;
-            particlesSystem.rotation.y += 0.008; // Xoay chậm cả cụm
-
-            for(let i=0; i < pRnd.length; i++) {
-                // Dao động lên xuống nhẹ theo sóng Sin
-                pPos[i*3+1] = Math.abs(Math.sin(time * 0.5 + pRnd[i])) * 0.8 + 0.1;
-            }
-            particlesSystem.geometry.attributes.position.needsUpdate = true;
-
             const pos = starField.geometry.attributes.position.array;
             for(let i=0; i < starsCount; i++) {
                 pos[i*3 + 1] -= velocityArray[i]; 
                 if (pos[i*3 + 1] < -40) pos[i*3 + 1] = 40;
             }
             starField.geometry.attributes.position.needsUpdate = true;
-            starField.rotation.y += 0.0005;
-
             renderer.render(scene, camera);
         }
         animate();
